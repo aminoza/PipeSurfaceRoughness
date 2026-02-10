@@ -1,0 +1,5 @@
+{
+  "name": "PipeSurface Pro",
+  "description": "Professional pipe surface roughness assessment tracker with real-time Firebase synchronization and analytics.",
+  "requestFramePermissions": []
+}
