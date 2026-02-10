@@ -2,19 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { InspectionForm } from './components/InspectionForm';
 import { InspectionHistory } from './components/InspectionHistory';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
-import { LayoutDashboard, PlusCircle, History, Menu, X, GripHorizontal, WifiOff } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, History, GripHorizontal, WifiOff } from 'lucide-react';
 
 type View = 'dashboard' | 'new' | 'history';
 
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-  { id: 'new', label: 'New Inspection', icon: <PlusCircle className="w-5 h-5" /> },
-  { id: 'history', label: 'History', icon: <History className="w-5 h-5" /> },
+  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-6 h-6" /> },
+  { id: 'new', label: 'New', icon: <PlusCircle className="w-6 h-6" /> },
+  { id: 'history', label: 'History', icon: <History className="w-6 h-6" /> },
 ];
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -31,8 +30,8 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-      {/* Sidebar Navigation (Desktop) */}
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row pb-20 md:pb-0">
+      {/* Sidebar Navigation (Desktop Only) */}
       <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-white min-h-screen fixed left-0 top-0 z-30 shadow-2xl">
         <div className="p-6 border-b border-slate-700">
            <div className="flex items-center gap-3">
@@ -59,7 +58,7 @@ const App: React.FC = () => {
               `}
             >
               {item.icon}
-              <span className="font-medium">{item.label}</span>
+              <span className="font-medium">{item.label === 'New' ? 'New Inspection' : item.label}</span>
             </button>
           ))}
         </nav>
@@ -88,58 +87,53 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      {/* Mobile Header */}
-      <header className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-40 shadow-md">
+      {/* Mobile Header (Simplified) */}
+      <header className="md:hidden bg-white text-gray-800 p-4 sticky top-0 z-40 shadow-sm border-b border-gray-100 flex items-center justify-between">
          <div className="flex items-center gap-2">
              <div className="bg-blue-600 p-1.5 rounded-lg">
                <GripHorizontal className="w-5 h-5 text-white" />
              </div>
-             <span className="font-bold text-lg">PipeSurface</span>
+             <span className="font-bold text-lg tracking-tight">PipeSurface</span>
          </div>
-         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2">
-            {isMobileMenuOpen ? <X /> : <Menu />}
-         </button>
+         <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} title={isOnline ? "Online" : "Offline"} />
       </header>
 
-      {/* Mobile Menu Overlay */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-30 bg-slate-900/95 backdrop-blur-sm pt-20 px-6">
-           <nav className="space-y-4">
-              {NAV_ITEMS.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setCurrentView(item.id as View);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl text-lg font-medium transition-all
-                    ${currentView === item.id 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-slate-800 text-slate-300'
-                    }
-                  `}
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </button>
-              ))}
-           </nav>
-        </div>
-      )}
+      {/* Bottom Navigation Bar (Mobile Only) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe z-50 flex justify-around items-center h-16 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        {NAV_ITEMS.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setCurrentView(item.id as View)}
+            className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200
+              ${currentView === item.id 
+                ? 'text-blue-600' 
+                : 'text-gray-400 hover:text-gray-600'
+              }
+            `}
+          >
+            <div className={`transition-transform duration-200 ${currentView === item.id ? 'scale-110' : ''}`}>
+               {item.icon}
+            </div>
+            <span className="text-[10px] font-medium">{item.label}</span>
+          </button>
+        ))}
+      </nav>
 
       {/* Main Content Area */}
-      <main className="flex-1 md:ml-64 p-4 md:p-8 max-w-6xl mx-auto w-full pt-6">
+      <main className="flex-1 md:ml-64 p-4 md:p-8 max-w-6xl mx-auto w-full pt-4 md:pt-6">
         {!isOnline && (
-           <div className="mb-4 p-3 bg-red-100 border border-red-200 text-red-700 rounded-lg flex items-center gap-2 animate-pulse">
-              <WifiOff className="w-4 h-4" />
-              <span className="text-sm font-medium">No internet connection. Data may not save immediately.</span>
+           <div className="mb-4 p-3 bg-red-100 border border-red-200 text-red-700 rounded-lg flex items-center gap-2 animate-pulse text-sm">
+              <WifiOff className="w-4 h-4 flex-shrink-0" />
+              <span className="font-medium">No internet. Data will sync later.</span>
            </div>
         )}
-        <div className="mb-8">
-           <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-             {NAV_ITEMS.find(i => i.id === currentView)?.label}
+        
+        {/* View Header (Desktop & Mobile) */}
+        <div className="mb-6">
+           <h2 className="text-xl md:text-3xl font-bold text-gray-800">
+             {NAV_ITEMS.find(i => i.id === currentView)?.label === 'New' ? 'New Inspection' : NAV_ITEMS.find(i => i.id === currentView)?.label}
            </h2>
-           <p className="text-gray-500 mt-1">
+           <p className="text-sm md:text-base text-gray-500 mt-1">
              {currentView === 'dashboard' && 'Overview of inspection performance metrics.'}
              {currentView === 'new' && 'Enter details for a new pipe quality assessment.'}
              {currentView === 'history' && 'Browse and manage past inspection records.'}
