@@ -99,7 +99,7 @@ const App: React.FC = () => {
       </header>
 
       {/* Bottom Navigation Bar (Mobile Only) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe z-50 flex justify-around items-center h-16 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-4 z-50 flex justify-around items-center h-16 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
