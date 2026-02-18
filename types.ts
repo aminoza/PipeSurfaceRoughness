@@ -4,6 +4,7 @@ export interface InspectionData {
   id?: string;
   tester: string;
   date: string; // ISO Date string YYYY-MM-DD
+  time?: string; // HH:mm
   grade: string;
   lot: string;
   rating: number; // Roughness value (e.g., Ra)
