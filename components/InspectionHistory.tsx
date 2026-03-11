@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { db, collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc } from '../firebase';
 import { InspectionData } from '../types';
-import { Trash2, Search, FileText, Download, Box, Edit, X, Save, CheckCircle, Users, ChevronDown, Check, Filter, AlertTriangle } from 'lucide-react';
+import { Trash2, Search, FileText, Download, Box, Edit, X, Save, Users, ChevronDown, Check, Filter } from 'lucide-react';
 
 const TESTER_NAMES = [
   "Kriengsak Tarasri",

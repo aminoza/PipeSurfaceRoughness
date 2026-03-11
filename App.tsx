@@ -156,18 +156,6 @@ const App: React.FC = () => {
            </div>
         )}
         
-        {/* View Header */}
-        <div className="mb-6">
-           <h2 className="text-xl md:text-3xl font-normal text-gray-800">
-             {NAV_ITEMS.find(i => i.id === currentView)?.label === 'New' ? 'New Inspection' : NAV_ITEMS.find(i => i.id === currentView)?.label}
-           </h2>
-           <p className="text-sm md:text-base text-gray-500 mt-1">
-             {currentView === 'dashboard' && 'Overview of inspection performance metrics.'}
-             {currentView === 'new' && 'Enter details for a new pipe quality assessment.'}
-             {currentView === 'history' && 'Browse and manage past inspection records.'}
-           </p>
-        </div>
-
         <div className="animate-fade-in-up">
            {currentView === 'dashboard' && <AnalyticsDashboard />}
            {currentView === 'new' && <InspectionForm />}

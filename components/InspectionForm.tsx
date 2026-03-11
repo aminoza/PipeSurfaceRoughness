@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { db, collection, addDoc } from '../firebase';
+import React, { useState, useEffect, useCallback } from 'react';
+import { db, collection, addDoc, query, where, getDocs, updateDoc, doc } from '../firebase';
 import { InspectionData } from '../types';
-import { Loader2, CheckCircle, AlertCircle, Save } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, Save, HelpCircle } from 'lucide-react';
 
 const TESTER_NAMES = [
   "Kriengsak Tarasri",
@@ -17,6 +17,9 @@ export const InspectionForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [duplicateRecord, setDuplicateRecord] = useState<InspectionData | null>(null);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [lastCheckedKey, setLastCheckedKey] = useState<string>('');
 
   // Helper to get local date string YYYY-MM-DD
   const getLocalDate = () => {
@@ -43,6 +46,44 @@ export const InspectionForm: React.FC = () => {
     rating: 1,
   });
 
+  // Immediate Duplicate Check
+  const checkDuplicate = useCallback(async (tester: string, grade: string, lot: string) => {
+    if (!tester || !grade || !lot) return;
+    
+    const currentKey = `${tester}-${grade}-${lot}`;
+    if (currentKey === lastCheckedKey) return;
+
+    try {
+      const q = query(
+        collection(db, "inspections"),
+        where("tester", "==", tester),
+        where("grade", "==", grade),
+        where("lot", "==", lot)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const existingDoc = querySnapshot.docs[0];
+        setDuplicateRecord({ id: existingDoc.id, ...existingDoc.data() } as InspectionData);
+        setShowDuplicateModal(true);
+        setLastCheckedKey(currentKey);
+      }
+    } catch (err) {
+      console.error("Error checking duplicate: ", err);
+    }
+  }, [lastCheckedKey]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (formData.tester && formData.grade && formData.lot) {
+        checkDuplicate(formData.tester, formData.grade, formData.lot);
+      }
+    }, 600); // 600ms debounce
+
+    return () => clearTimeout(timer);
+  }, [formData.tester, formData.grade, formData.lot, checkDuplicate]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -58,30 +99,83 @@ export const InspectionForm: React.FC = () => {
     setSuccess(false);
 
     try {
+      // Final check before saving (in case they ignored the popup or it hasn't fired)
+      const q = query(
+        collection(db, "inspections"),
+        where("tester", "==", formData.tester),
+        where("grade", "==", formData.grade),
+        where("lot", "==", formData.lot)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const existingDoc = querySnapshot.docs[0];
+        setDuplicateRecord({ id: existingDoc.id, ...existingDoc.data() } as InspectionData);
+        setShowDuplicateModal(true);
+        setLoading(false);
+        return;
+      }
+
+      await saveNewRecord();
+    } catch (err) {
+      console.error("Error during submission: ", err);
+      setError("Failed to process request. Please check your connection.");
+      setLoading(false);
+    }
+  };
+
+  const saveNewRecord = async () => {
+    try {
       await addDoc(collection(db, "inspections"), {
         ...formData,
         createdAt: Date.now()
       });
-      setSuccess(true);
-      setFormData({
-        tester: '',
-        date: getLocalDate(),
-        time: getLocalTime(),
-        grade: '',
-        lot: '',
-        rating: 1,
-      });
-      setTimeout(() => setSuccess(false), 3000);
-      
-      // Optional: Scroll to top on mobile after submit
-      if (window.innerWidth < 768) {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+      handleSuccess();
     } catch (err) {
       console.error("Error adding document: ", err);
       setError("Failed to save data. Please check your connection.");
-    } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateExisting = async () => {
+    if (!duplicateRecord?.id) return;
+    
+    setLoading(true);
+    setShowDuplicateModal(false);
+    
+    try {
+      const docRef = doc(db, "inspections", duplicateRecord.id);
+      await updateDoc(docRef, {
+        ...formData,
+        createdAt: Date.now() // Update timestamp to reflect the edit
+      });
+      handleSuccess();
+    } catch (err) {
+      console.error("Error updating document: ", err);
+      setError("Failed to update existing record.");
+      setLoading(false);
+    }
+  };
+
+  const handleSuccess = () => {
+    setSuccess(true);
+    setFormData({
+      tester: '',
+      date: getLocalDate(),
+      time: getLocalTime(),
+      grade: '',
+      lot: '',
+      rating: 1,
+    });
+    setDuplicateRecord(null);
+    setLastCheckedKey('');
+    setLoading(false);
+    setTimeout(() => setSuccess(false), 3000);
+    
+    if (window.innerWidth < 768) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -109,6 +203,43 @@ export const InspectionForm: React.FC = () => {
       </div>
       
       <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-5 md:space-y-6" autoComplete="off">
+        {showDuplicateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100">
+              <div className="p-6">
+                <div className="flex items-center gap-3 text-[#FBBC05] mb-4">
+                  <HelpCircle className="w-8 h-8" />
+                  <h3 className="text-xl font-bold text-gray-800">Duplicate Found</h3>
+                </div>
+                <p className="text-gray-600 mb-6 leading-relaxed">
+                  Grade <span className="font-bold text-gray-900">"{formData.grade}"</span> และ Lot <span className="font-bold text-gray-900">"{formData.lot}"</span> เคยทำไปแล้วโดย <span className="font-bold text-gray-900">{formData.tester}</span>
+                  <br /><br />
+                  ต้องการแก้ไขผลเดิมใช่หรือไม่?
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleUpdateExisting}
+                    className="flex-1 py-3 bg-[#1a73e8] hover:bg-[#1557b0] text-white font-bold rounded-lg transition-colors shadow-sm"
+                  >
+                    ใช่ (แก้ไข)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDuplicateModal(false);
+                      setDuplicateRecord(null);
+                    }}
+                    className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition-colors"
+                  >
+                    ไม่ใช่
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {success && (
           <div className="bg-[#e6f4ea] text-[#137333] p-4 rounded flex items-center gap-2 animate-fade-in border border-[#ceead6]">
             <CheckCircle className="w-5 h-5 flex-shrink-0" />
