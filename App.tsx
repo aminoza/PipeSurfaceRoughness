@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { InspectionForm } from './components/InspectionForm';
 import { InspectionHistory } from './components/InspectionHistory';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
@@ -162,6 +163,7 @@ const App: React.FC = () => {
            {currentView === 'history' && <InspectionHistory />}
         </div>
       </main>
+      <SpeedInsights />
     </div>
   );
 };
