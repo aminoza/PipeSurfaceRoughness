@@ -13,6 +13,20 @@ const TESTER_NAMES = [
   "Thunchanok Hongsakul"
 ];
 
+const PIPE_GRADES = [
+  "H1000PBL",
+  "H1000P",
+  "H112P",
+  "H112PC2",
+  "H1000PC",
+  "H1000PC1",
+  "S1000P",
+  "H112PC",
+  "H1000PCH",
+  "D682PC",
+  "Others"
+];
+
 export const InspectionForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -20,6 +34,7 @@ export const InspectionForm: React.FC = () => {
   const [duplicateRecord, setDuplicateRecord] = useState<InspectionData | null>(null);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [lastCheckedKey, setLastCheckedKey] = useState<string>('');
+  const [selectedGrade, setSelectedGrade] = useState('');
 
   // Helper to get local date string YYYY-MM-DD
   const getLocalDate = () => {
@@ -169,6 +184,7 @@ export const InspectionForm: React.FC = () => {
       lot: '',
       rating: 1,
     });
+    setSelectedGrade('');
     setDuplicateRecord(null);
     setLastCheckedKey('');
     setLoading(false);
@@ -298,16 +314,41 @@ export const InspectionForm: React.FC = () => {
 
           <div className="space-y-1.5 md:space-y-2">
             <label htmlFor="grade" className="text-sm font-medium text-gray-700">Pipe Grade</label>
-            <input
-              required
-              id="grade"
-              type="text"
-              name="grade"
-              placeholder="e.g. Type A"
-              value={formData.grade}
-              onChange={handleChange}
-              className="w-full px-4 py-3 rounded border border-gray-300 focus:ring-2 focus:ring-[#4285F4] focus:border-[#4285F4] transition-all outline-none text-base"
-            />
+            <div className="space-y-2">
+              <select
+                required
+                id="grade-select"
+                value={selectedGrade}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedGrade(val);
+                  if (val !== 'Others') {
+                    setFormData(prev => ({ ...prev, grade: val }));
+                  } else {
+                    setFormData(prev => ({ ...prev, grade: '' }));
+                  }
+                }}
+                className="w-full px-4 py-3 rounded border border-gray-300 focus:ring-2 focus:ring-[#4285F4] focus:border-[#4285F4] transition-all outline-none bg-white text-base"
+              >
+                <option value="" disabled>Select Grade</option>
+                {PIPE_GRADES.map((grade) => (
+                  <option key={grade} value={grade}>{grade}</option>
+                ))}
+              </select>
+              
+              {selectedGrade === 'Others' && (
+                <input
+                  required
+                  id="grade"
+                  type="text"
+                  name="grade"
+                  placeholder="Enter custom grade"
+                  value={formData.grade}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded border border-gray-300 focus:ring-2 focus:ring-[#4285F4] focus:border-[#4285F4] transition-all outline-none text-base animate-fade-in"
+                />
+              )}
+            </div>
           </div>
 
           <div className="space-y-1.5 md:space-y-2">
