@@ -14,16 +14,16 @@ const TESTER_NAMES = [
 ];
 
 const PIPE_GRADES = [
-  "H1000PBL",
-  "H1000P",
+  "D682PC",
   "H112P",
+  "H112PC",
   "H112PC2",
+  "H1000P",
+  "H1000PBL",
   "H1000PC",
   "H1000PC1",
-  "S1000P",
-  "H112PC",
   "H1000PCH",
-  "D682PC",
+  "S1000P",
   "Others"
 ];
 
