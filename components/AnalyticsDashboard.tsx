@@ -261,36 +261,6 @@ export const AnalyticsDashboard: React.FC = () => {
                 <tr className="border-b border-gray-200 bg-gray-50">
                   <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     <div className="flex flex-col gap-2">
-                      <span>Date</span>
-                      <select 
-                        className="font-normal text-[10px] p-1 border border-gray-200 rounded w-full focus:outline-none focus:border-[#4285F4] bg-white"
-                        value={tableFilters.date}
-                        onChange={(e) => setTableFilters(prev => ({ ...prev, date: e.target.value }))}
-                      >
-                        <option value="">All</option>
-                        {uniqueTableValues.dates.map(v => (
-                          <option key={v} value={v}>{v}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    <div className="flex flex-col gap-2">
-                      <span>Tester</span>
-                      <select 
-                        className="font-normal text-[10px] p-1 border border-gray-200 rounded w-full focus:outline-none focus:border-[#4285F4] bg-white"
-                        value={tableFilters.tester}
-                        onChange={(e) => setTableFilters(prev => ({ ...prev, tester: e.target.value }))}
-                      >
-                        <option value="">All</option>
-                        {uniqueTableValues.testers.map(v => (
-                          <option key={v} value={v}>{v}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    <div className="flex flex-col gap-2">
                       <span>Grade</span>
                       <select 
                         className="font-normal text-[10px] p-1 border border-gray-200 rounded w-full focus:outline-none focus:border-[#4285F4] bg-white"
@@ -334,13 +304,41 @@ export const AnalyticsDashboard: React.FC = () => {
                       </select>
                     </div>
                   </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex flex-col gap-2">
+                      <span>Tester</span>
+                      <select 
+                        className="font-normal text-[10px] p-1 border border-gray-200 rounded w-full focus:outline-none focus:border-[#4285F4] bg-white"
+                        value={tableFilters.tester}
+                        onChange={(e) => setTableFilters(prev => ({ ...prev, tester: e.target.value }))}
+                      >
+                        <option value="">All</option>
+                        {uniqueTableValues.testers.map(v => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex flex-col gap-2">
+                      <span>Date</span>
+                      <select 
+                        className="font-normal text-[10px] p-1 border border-gray-200 rounded w-full focus:outline-none focus:border-[#4285F4] bg-white"
+                        value={tableFilters.date}
+                        onChange={(e) => setTableFilters(prev => ({ ...prev, date: e.target.value }))}
+                      >
+                        <option value="">All</option>
+                        {uniqueTableValues.dates.map(v => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredData.map((item, idx) => (
                   <tr key={item.id || idx} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{item.date} {item.time}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 font-medium">{item.tester}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">{item.grade}</td>
                     <td className="px-4 py-3 text-sm text-gray-700 font-mono">{item.lot}</td>
                     <td className="px-4 py-3 text-sm text-center">
@@ -350,6 +348,8 @@ export const AnalyticsDashboard: React.FC = () => {
                         {item.rating}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 font-medium">{item.tester}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{item.date} {item.time}</td>
                   </tr>
                 ))}
                 {filteredData.length === 0 && (
