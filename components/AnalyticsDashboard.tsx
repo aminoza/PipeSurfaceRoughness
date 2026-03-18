@@ -108,14 +108,27 @@ export const AnalyticsDashboard: React.FC = () => {
   }, [filteredData]);
 
   const uniqueTableValues = useMemo(() => {
-    return {
-      dates: Array.from(new Set(data.map(d => `${d.date} ${d.time}`))).sort(),
-      testers: Array.from(new Set(data.map(d => d.tester))).sort(),
-      grades: Array.from(new Set(data.map(d => d.grade))).sort(),
-      lots: Array.from(new Set(data.map(d => d.lot))).sort(),
-      ratings: Array.from(new Set(data.map(d => d.rating.toString()))).sort((a, b) => Number(a) - Number(b))
+    const getFilteredOptions = (excludeKey: keyof typeof tableFilters) => {
+      return data.filter(item => {
+        const dateStr = `${item.date} ${item.time}`;
+        const dateMatch = excludeKey === 'date' || tableFilters.date === '' || dateStr === tableFilters.date;
+        const testerMatch = excludeKey === 'tester' || tableFilters.tester === '' || item.tester === tableFilters.tester;
+        const gradeMatch = excludeKey === 'grade' || tableFilters.grade === '' || item.grade === tableFilters.grade;
+        const lotMatch = excludeKey === 'lot' || tableFilters.lot === '' || item.lot === tableFilters.lot;
+        const ratingMatch = excludeKey === 'rating' || tableFilters.rating === '' || item.rating.toString() === tableFilters.rating;
+        
+        return dateMatch && testerMatch && gradeMatch && lotMatch && ratingMatch;
+      });
     };
-  }, [data]);
+
+    return {
+      dates: Array.from(new Set(getFilteredOptions('date').map(d => `${d.date} ${d.time}`))).sort(),
+      testers: Array.from(new Set(getFilteredOptions('tester').map(d => d.tester))).sort(),
+      grades: Array.from(new Set(getFilteredOptions('grade').map(d => d.grade))).sort(),
+      lots: Array.from(new Set(getFilteredOptions('lot').map(d => d.lot))).sort(),
+      ratings: Array.from(new Set(getFilteredOptions('rating').map(d => d.rating.toString()))).sort((a, b) => Number(a) - Number(b))
+    };
+  }, [data, tableFilters]);
 
   // Data for Box/Scatter Plot
   const chartData = useMemo(() => {
