@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { db, collection, query, orderBy, onSnapshot } from '../firebase';
 import { InspectionData } from '../types';
-import { BarChart2, ScatterChart, Settings2, ChevronDown, Check } from 'lucide-react';
+import { BarChart2, ScatterChart, Settings2, ChevronDown, Check, Grid3X3 } from 'lucide-react';
 
 // --- Statistical Helper Functions ---
 const calculateMean = (values: number[]) => {
@@ -388,11 +388,90 @@ export const AnalyticsDashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* 0. Matrix Heatmap (Overview) */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="flex items-center gap-2 mb-4">
+            <Grid3X3 className="w-5 h-5 text-[#4285F4]" />
+            <h3 className="text-lg font-medium text-gray-800">Matrix Heatmap (Global Overview)</h3>
+          </div>
+          <p className="text-sm text-gray-500 mb-6">Quick overview of all data patterns by Grade and Lot. (Unaffected by table filters)</p>
+          <MatrixHeatmap data={data} />
+        </div>
+
     </div>
   );
 };
 
 // --- Sub-components ---
+
+const MatrixHeatmap = ({ data }: { data: InspectionData[] }) => {
+  const heatmapData = useMemo(() => {
+    const grades = Array.from(new Set(data.map(d => d.grade))).sort();
+    const lots = Array.from(new Set(data.map(d => d.lot))).sort();
+    
+    const matrix: Record<string, Record<string, { sum: number, count: number }>> = {};
+    
+    data.forEach(d => {
+      if (!matrix[d.lot]) matrix[d.lot] = {};
+      if (!matrix[d.lot][d.grade]) matrix[d.lot][d.grade] = { sum: 0, count: 0 };
+      matrix[d.lot][d.grade].sum += d.rating;
+      matrix[d.lot][d.grade].count += 1;
+    });
+
+    return { grades, lots, matrix };
+  }, [data]);
+
+  const getColorClass = (value: number) => {
+    if (value >= 90) return 'bg-[#0F9D58] text-white'; // Dark Green
+    if (value >= 80) return 'bg-[#B4D455] text-gray-800'; // Light Green
+    if (value >= 70) return 'bg-[#F4B400] text-white'; // Orange/Yellow
+    return 'bg-[#F48B8B] text-white'; // Red/Pink
+  };
+
+  if (heatmapData.grades.length === 0) return null;
+
+  return (
+    <div className="w-full max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+      <table className="w-full border-separate border-spacing-2">
+        <thead className="sticky top-0 bg-white z-10">
+          <tr>
+            <th className="w-32 bg-white"></th>
+            {heatmapData.grades.map(grade => (
+              <th key={grade} className="px-4 py-2 text-sm font-medium text-gray-500 text-center bg-white">
+                {grade}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {heatmapData.lots.map(lot => (
+            <tr key={lot}>
+              <td className="pr-4 py-2 text-sm font-bold text-gray-700 text-right">
+                {lot}
+              </td>
+              {heatmapData.grades.map(grade => {
+                const cell = heatmapData.matrix[lot]?.[grade];
+                const avg = cell ? cell.sum / cell.count : null;
+                
+                return (
+                  <td key={grade} className="p-0">
+                    <div className={`
+                      h-16 rounded-lg flex items-center justify-center text-lg font-bold transition-all
+                      ${avg !== null ? getColorClass(avg) : 'bg-gray-50 text-gray-300'}
+                      shadow-sm hover:scale-[1.02] cursor-default
+                    `}>
+                      {avg !== null ? Math.round(avg) : '-'}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
 const MultiSelect = ({ options, selected, onChange, placeholder }: { 
   options: string[], 
