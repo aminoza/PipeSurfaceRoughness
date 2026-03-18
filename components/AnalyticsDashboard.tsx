@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { db, collection, query, orderBy, onSnapshot } from '../firebase';
 import { InspectionData } from '../types';
-import { Filter, BarChart2, ScatterChart, Settings2, ChevronDown, Check } from 'lucide-react';
+import { BarChart2, ScatterChart, Settings2 } from 'lucide-react';
 
 // --- Statistical Helper Functions ---
 const calculateMean = (values: number[]) => {
@@ -49,110 +49,27 @@ const calculateQuartiles = (values: number[]) => {
 
 // --- Types ---
 type ChartType = 'box' | 'scatter' | 'combined';
+type AggregationType = 'mean' | 'median' | 'mode';
 
-// --- MultiSelect Component ---
-interface MultiSelectProps {
-  label: string;
-  options: string[];
-  selected: string[];
-  onChange: (selected: string[]) => void;
-}
+// --- Types ---
 
-const MultiSelect: React.FC<MultiSelectProps> = ({ label, options, selected, onChange }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Close when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const toggleOption = (option: string) => {
-    const newSelected = selected.includes(option)
-      ? selected.filter(item => item !== option)
-      : [...selected, option];
-    onChange(newSelected);
-  };
-
-  const selectAll = () => onChange([]); // Empty array means "All" in our logic
-  const clearAll = () => onChange([]); // Reset to default (All)
-
-  const isAllSelected = selected.length === 0;
-
-  return (
-    <div className="relative" ref={containerRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full md:w-56 px-4 py-2 bg-white border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors focus:ring-2 focus:ring-[#4285F4] outline-none"
-      >
-        <span className="truncate">
-          {isAllSelected 
-            ? `All ${label}s` 
-            : `${selected.length} ${label}${selected.length > 1 ? 's' : ''} Selected`}
-        </span>
-        <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isOpen && (
-        <div className="absolute z-50 w-64 mt-2 bg-white border border-gray-200 rounded shadow-xl max-h-80 overflow-y-auto animate-fade-in-up">
-          <div className="p-2 border-b border-gray-100 sticky top-0 bg-white z-10 flex justify-between">
-            <button 
-              onClick={selectAll}
-              className="text-xs font-semibold text-[#1967d2] hover:bg-[#e8f0fe] px-2 py-1 rounded"
-            >
-              Select All
-            </button>
-            {!isAllSelected && (
-              <button 
-                onClick={clearAll}
-                className="text-xs font-semibold text-gray-500 hover:bg-gray-100 px-2 py-1 rounded"
-              >
-                Reset
-              </button>
-            )}
-          </div>
-          <div className="p-2 space-y-1">
-            {options.map(option => {
-              const isSelected = selected.includes(option);
-              return (
-                <div 
-                  key={option} 
-                  onClick={() => toggleOption(option)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors text-sm
-                    ${isSelected ? 'bg-[#e8f0fe] text-[#1967d2]' : 'hover:bg-gray-50 text-gray-700'}
-                  `}
-                >
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors
-                    ${isSelected ? 'bg-[#4285F4] border-[#4285F4]' : 'border-gray-300 bg-white'}
-                  `}>
-                    {isSelected && <Check className="w-3 h-3 text-white" />}
-                  </div>
-                  <span className="truncate">{option}</span>
-                </div>
-              );
-            })}
-            {options.length === 0 && <div className="text-center text-gray-400 py-2 text-xs">No options available</div>}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 export const AnalyticsDashboard: React.FC = () => {
   const [data, setData] = useState<InspectionData[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Filters & Controls (Arrays for multi-select)
-  const [selectedTesters, setSelectedTesters] = useState<string[]>([]);
-  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  // Filters & Controls
   const [chartType, setChartType] = useState<ChartType>('combined');
+  const [aggType, setAggType] = useState<AggregationType>('mean');
+
+  // Unified filters (from table columns)
+  const [tableFilters, setTableFilters] = useState({
+    date: '',
+    tester: '',
+    grade: '',
+    lot: '',
+    rating: ''
+  });
 
   useEffect(() => {
     const q = query(collection(db, "inspections"), orderBy("createdAt", "asc"));
@@ -167,17 +84,18 @@ export const AnalyticsDashboard: React.FC = () => {
   }, []);
 
   // --- Derived Data ---
-  const uniqueTesters = useMemo(() => Array.from(new Set(data.map(d => d.tester))).sort(), [data]);
-  const uniqueGrades = useMemo(() => Array.from(new Set(data.map(d => d.grade))).sort(), [data]);
-
   const filteredData = useMemo(() => {
-    return data.filter(d => {
-      // Empty array means "All Selected"
-      const matchTester = selectedTesters.length === 0 || selectedTesters.includes(d.tester);
-      const matchGrade = selectedGrades.length === 0 || selectedGrades.includes(d.grade);
-      return matchTester && matchGrade;
+    return data.filter(item => {
+      const dateStr = `${item.date} ${item.time}`;
+      const dateMatch = tableFilters.date === '' || dateStr === tableFilters.date;
+      const testerMatch = tableFilters.tester === '' || item.tester === tableFilters.tester;
+      const gradeMatch = tableFilters.grade === '' || item.grade === tableFilters.grade;
+      const lotMatch = tableFilters.lot === '' || item.lot === tableFilters.lot;
+      const ratingMatch = tableFilters.rating === '' || item.rating.toString() === tableFilters.rating;
+      
+      return dateMatch && testerMatch && gradeMatch && lotMatch && ratingMatch;
     });
-  }, [data, selectedTesters, selectedGrades]);
+  }, [data, tableFilters]);
 
   const overallStats = useMemo(() => {
     const ratings = filteredData.map(d => d.rating);
@@ -189,28 +107,43 @@ export const AnalyticsDashboard: React.FC = () => {
     };
   }, [filteredData]);
 
+  const uniqueTableValues = useMemo(() => {
+    return {
+      dates: Array.from(new Set(data.map(d => `${d.date} ${d.time}`))).sort(),
+      testers: Array.from(new Set(data.map(d => d.tester))).sort(),
+      grades: Array.from(new Set(data.map(d => d.grade))).sort(),
+      lots: Array.from(new Set(data.map(d => d.lot))).sort(),
+      ratings: Array.from(new Set(data.map(d => d.rating.toString()))).sort((a, b) => Number(a) - Number(b))
+    };
+  }, [data]);
+
   // Data for Box/Scatter Plot
   const chartData = useMemo(() => {
-    // Group by Lot
-    const groupedByLot: Record<string, number[]> = {};
-    const lotDetails: Record<string, { grade: string }> = {};
+    // Group by Grade and Lot
+    const grouped: Record<string, { rating: number, tester: string }[]> = {};
+    const details: Record<string, { grade: string, lot: string }> = {};
 
     filteredData.forEach(d => {
-      if (!groupedByLot[d.lot]) groupedByLot[d.lot] = [];
-      groupedByLot[d.lot].push(d.rating);
-      lotDetails[d.lot] = { grade: d.grade };
+      const key = `${d.grade}-${d.lot}`;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push({ rating: d.rating, tester: d.tester });
+      details[key] = { grade: d.grade, lot: d.lot };
     });
 
-    return Object.keys(groupedByLot).map(lot => {
-      const values = groupedByLot[lot];
-      const stats = calculateQuartiles(values);
-      const mean = calculateMean(values);
+    return Object.keys(grouped).map(key => {
+      const values = grouped[key];
+      const ratings = values.map(v => v.rating);
+      const stats = calculateQuartiles(ratings);
+      const mean = calculateMean(ratings);
+      const mode = calculateMode(ratings);
       return {
-        lot,
-        values, // for scatter
+        key,
+        lot: details[key].lot,
+        grade: details[key].grade,
+        values, // for scatter (now includes tester)
         ...stats, // min, q1, median, q3, max
         mean,
-        grade: lotDetails[lot].grade
+        mode
       };
     });
   }, [filteredData]);
@@ -220,42 +153,33 @@ export const AnalyticsDashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       
-      {/* 1. Controls Section */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-        <div className="flex flex-col md:flex-row gap-3">
-           {/* Multi Select for Grade */}
-           <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-400 hidden md:block" />
-              <MultiSelect 
-                label="Grade" 
-                options={uniqueGrades} 
-                selected={selectedGrades} 
-                onChange={setSelectedGrades} 
-              />
-           </div>
-
-           {/* Multi Select for Tester */}
-           <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-400 hidden md:block" />
-              <MultiSelect 
-                label="Tester" 
-                options={uniqueTesters} 
-                selected={selectedTesters} 
-                onChange={setSelectedTesters} 
-              />
-           </div>
-           
-           {/* Active Filters Summary (Mobile mostly) */}
-           {(selectedGrades.length > 0 || selectedTesters.length > 0) && (
-              <button 
-                onClick={() => { setSelectedGrades([]); setSelectedTesters([]); }}
-                className="text-xs text-[#EA4335] hover:text-[#c5221f] underline self-start md:self-center"
-              >
-                Clear Filters
-              </button>
-           )}
+      <div className="grid grid-cols-1 gap-6">
+        {/* 3. Advanced Chart (Roughness) */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <h3 className="text-lg font-medium text-gray-800 mb-2">Process Control Analysis</h3>
+          <p className="text-sm text-gray-500 mb-6">Distribution of roughness scores by Lot Number.</p>
+          
+          <div className="w-full overflow-x-auto">
+            <div className="min-w-[800px] h-[450px]">
+               {chartData.length > 0 ? (
+                 <BoxScatterChart 
+                   data={chartData} 
+                   type={chartType} 
+                   aggType={aggType}
+                   showGradeLabel={tableFilters.grade === ''}
+                 />
+               ) : (
+                 <div className="h-full flex items-center justify-center text-gray-400 flex-col gap-2">
+                   <Settings2 className="w-8 h-8 text-gray-300" />
+                   <span>No data matches the selected filters.</span>
+                 </div>
+               )}
+            </div>
+          </div>
         </div>
+      </div>
 
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div className="flex bg-[#f1f3f4] p-1 rounded self-start xl:self-auto">
           <button 
             onClick={() => setChartType('scatter')}
@@ -278,6 +202,30 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* 1.1 Aggregation Selection */}
+      <div className="flex justify-end">
+        <div className="flex bg-[#f1f3f4] p-1 rounded">
+          <button 
+            onClick={() => setAggType('mean')}
+            className={`px-3 py-1 rounded text-xs font-medium transition-all ${aggType === 'mean' ? 'bg-white shadow-sm text-[#4285F4]' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Mean
+          </button>
+          <button 
+            onClick={() => setAggType('median')}
+            className={`px-3 py-1 rounded text-xs font-medium transition-all ${aggType === 'median' ? 'bg-white shadow-sm text-[#4285F4]' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Middle (Median)
+          </button>
+          <button 
+            onClick={() => setAggType('mode')}
+            className={`px-3 py-1 rounded text-xs font-medium transition-all ${aggType === 'mode' ? 'bg-white shadow-sm text-[#4285F4]' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Most (Mode)
+          </button>
+        </div>
+      </div>
+
       {/* 2. Summary Statistics Cards - Google Colors */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
          <StatCard label="Total Inspections" value={overallStats.count} color="blue" />
@@ -286,26 +234,135 @@ export const AnalyticsDashboard: React.FC = () => {
          <StatCard label="Mode Score" value={overallStats.mode} color="red" subtext="Most Frequent" />
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {/* 3. Advanced Chart (Roughness) */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <h3 className="text-lg font-medium text-gray-800 mb-2">Process Control Analysis</h3>
-          <p className="text-sm text-gray-500 mb-6">Distribution of roughness scores by Lot Number.</p>
-          
-          <div className="w-full overflow-x-auto">
-            <div className="min-w-[800px] h-[450px]">
-               {chartData.length > 0 ? (
-                 <BoxScatterChart data={chartData} type={chartType} />
-               ) : (
-                 <div className="h-full flex items-center justify-center text-gray-400 flex-col gap-2">
-                   <Settings2 className="w-8 h-8 text-gray-300" />
-                   <span>No data matches the selected filters.</span>
-                 </div>
-               )}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div>
+                <h3 className="text-lg font-medium text-gray-800">Inspection Raw Data</h3>
+                <p className="text-sm text-gray-500">Detailed list of inspections matching current filters.</p>
+              </div>
+              {Object.values(tableFilters).some(v => v !== '') && (
+                <button 
+                  onClick={() => setTableFilters({ date: '', tester: '', grade: '', lot: '', rating: '' })}
+                  className="text-xs text-[#EA4335] hover:text-[#c5221f] underline"
+                >
+                  Clear All Filters
+                </button>
+              )}
             </div>
+            <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+              {filteredData.length} Records
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex flex-col gap-2">
+                      <span>Date</span>
+                      <select 
+                        className="font-normal text-[10px] p-1 border border-gray-200 rounded w-full focus:outline-none focus:border-[#4285F4] bg-white"
+                        value={tableFilters.date}
+                        onChange={(e) => setTableFilters(prev => ({ ...prev, date: e.target.value }))}
+                      >
+                        <option value="">All</option>
+                        {uniqueTableValues.dates.map(v => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex flex-col gap-2">
+                      <span>Tester</span>
+                      <select 
+                        className="font-normal text-[10px] p-1 border border-gray-200 rounded w-full focus:outline-none focus:border-[#4285F4] bg-white"
+                        value={tableFilters.tester}
+                        onChange={(e) => setTableFilters(prev => ({ ...prev, tester: e.target.value }))}
+                      >
+                        <option value="">All</option>
+                        {uniqueTableValues.testers.map(v => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex flex-col gap-2">
+                      <span>Grade</span>
+                      <select 
+                        className="font-normal text-[10px] p-1 border border-gray-200 rounded w-full focus:outline-none focus:border-[#4285F4] bg-white"
+                        value={tableFilters.grade}
+                        onChange={(e) => setTableFilters(prev => ({ ...prev, grade: e.target.value }))}
+                      >
+                        <option value="">All</option>
+                        {uniqueTableValues.grades.map(v => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <div className="flex flex-col gap-2">
+                      <span>Lot Number</span>
+                      <select 
+                        className="font-normal text-[10px] p-1 border border-gray-200 rounded w-full focus:outline-none focus:border-[#4285F4] bg-white"
+                        value={tableFilters.lot}
+                        onChange={(e) => setTableFilters(prev => ({ ...prev, lot: e.target.value }))}
+                      >
+                        <option value="">All</option>
+                        {uniqueTableValues.lots.map(v => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider text-center">
+                    <div className="flex flex-col gap-2">
+                      <span>Rating</span>
+                      <select 
+                        className="font-normal text-[10px] p-1 border border-gray-200 rounded w-full focus:outline-none focus:border-[#4285F4] bg-white"
+                        value={tableFilters.rating}
+                        onChange={(e) => setTableFilters(prev => ({ ...prev, rating: e.target.value }))}
+                      >
+                        <option value="">All</option>
+                        {uniqueTableValues.ratings.map(v => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredData.map((item, idx) => (
+                  <tr key={item.id || idx} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{item.date} {item.time}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 font-medium">{item.tester}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{item.grade}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 font-mono">{item.lot}</td>
+                    <td className="px-4 py-3 text-sm text-center">
+                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-white
+                        ${item.rating <= 2 ? 'bg-[#34A853]' : item.rating === 3 ? 'bg-[#FBBC05]' : 'bg-[#EA4335]'}
+                      `}>
+                        {item.rating}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {filteredData.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-gray-400 italic">
+                      No data available for the current filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
 
     </div>
   );
@@ -337,18 +394,25 @@ const StatCard = ({ label, value, color, subtext }: { label: string, value: stri
 // --- SVG Chart Component (Box/Scatter) ---
 interface ChartDataPoint {
   lot: string;
-  values: number[];
+  grade: string;
+  values: { rating: number, tester: string }[];
   min: number;
   q1: number;
   median: number;
   q3: number;
   max: number;
   mean: number;
+  mode: number;
 }
 
-const BoxScatterChart = ({ data, type }: { data: ChartDataPoint[], type: ChartType }) => {
+const BoxScatterChart = ({ data, type, aggType, showGradeLabel }: { 
+  data: ChartDataPoint[], 
+  type: ChartType, 
+  aggType: AggregationType,
+  showGradeLabel: boolean
+}) => {
   const chartHeight = 400;
-  const padding = { top: 20, right: 30, bottom: 80, left: 50 };
+  const padding = { top: 20, right: 30, bottom: 120, left: 50 };
   const graphWidth = Math.max(800, data.length * 80); // Dynamic width
   const graphHeight = chartHeight - padding.top - padding.bottom;
 
@@ -375,8 +439,10 @@ const BoxScatterChart = ({ data, type }: { data: ChartDataPoint[], type: ChartTy
           const xCenter = (index + 0.5) * (graphWidth / data.length);
           const boxWidth = (graphWidth / data.length) * 0.4;
           
+          const aggValue = aggType === 'mean' ? item.mean : aggType === 'median' ? item.median : item.mode;
+
           return (
-            <g key={item.lot}>
+            <g key={`${item.grade}-${item.lot}`}>
               
               {/* Box Plot Layer */}
               {(type === 'box' || type === 'combined') && (
@@ -420,32 +486,38 @@ const BoxScatterChart = ({ data, type }: { data: ChartDataPoint[], type: ChartTy
                       <circle 
                         key={i} 
                         cx={xCenter + jitter} 
-                        cy={scaleY(val)} 
+                        cy={scaleY(val.rating)} 
                         r={4} 
-                        fill={
-                           val <= 2 ? '#34A853' :  // Google Green
-                           val === 3 ? '#FBBC05' : // Google Yellow
-                           '#EA4335'               // Google Red
-                        }
+                        fill="#9aa0a6" // Grey color
                         fillOpacity="0.8"
                         stroke="white"
                         strokeWidth="1"
-                      />
+                        className="cursor-help"
+                      >
+                        <title>Tester: {val.tester}</title>
+                      </circle>
                     );
                   })}
                 </g>
               )}
 
-              {/* Mean Marker (Triangle) */}
-              <path 
-                d={`M ${xCenter} ${scaleY(item.mean) - 8} L ${xCenter + 6} ${scaleY(item.mean) + 4} L ${xCenter - 6} ${scaleY(item.mean) + 4} Z`}
-                fill="#1967d2"
-                stroke="white"
-                strokeWidth="1"
-              />
-              <text x={xCenter} y={scaleY(item.mean) - 12} textAnchor="middle" fontSize="10" fill="#1967d2" fontWeight="bold">
-                {item.mean.toFixed(2)}
-              </text>
+              {/* Aggregation Marker (Triangle) */}
+              {(() => {
+                const markerColor = aggType === 'mean' ? '#137333' : aggType === 'median' ? '#b06000' : '#c5221f';
+                return (
+                  <g>
+                    <path 
+                      d={`M ${xCenter} ${scaleY(aggValue) - 8} L ${xCenter + 6} ${scaleY(aggValue) + 4} L ${xCenter - 6} ${scaleY(aggValue) + 4} Z`}
+                      fill={markerColor}
+                      stroke="white"
+                      strokeWidth="1"
+                    />
+                    <text x={xCenter} y={scaleY(aggValue) - 12} textAnchor="middle" fontSize="10" fill={markerColor} fontWeight="bold">
+                      {aggValue.toFixed(2)}
+                    </text>
+                  </g>
+                );
+              })()}
 
               {/* X Axis Labels */}
               <text 
@@ -453,11 +525,11 @@ const BoxScatterChart = ({ data, type }: { data: ChartDataPoint[], type: ChartTy
                 y={0} 
                 transform={`translate(${xCenter}, ${graphHeight + 15}) rotate(-90)`} 
                 textAnchor="end" 
-                fontSize="12" 
+                fontSize="11" 
                 fill="#3c4043"
                 fontWeight="500"
               >
-                {item.lot}
+                {showGradeLabel ? `${item.grade} - ${item.lot}` : item.lot}
               </text>
 
             </g>
