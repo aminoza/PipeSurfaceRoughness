@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { db, collection, query, orderBy, onSnapshot } from '../firebase';
 import { InspectionData } from '../types';
-import { BarChart2, ScatterChart, Settings2 } from 'lucide-react';
+import { BarChart2, ScatterChart, Settings2, ChevronDown, Check } from 'lucide-react';
 
 // --- Statistical Helper Functions ---
 const calculateMean = (values: number[]) => {
@@ -59,14 +59,14 @@ export const AnalyticsDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   
   // Filters & Controls
-  const [chartType, setChartType] = useState<ChartType>('combined');
+  const [chartType, setChartType] = useState<ChartType>('scatter');
   const [aggType, setAggType] = useState<AggregationType>('mean');
 
   // Unified filters (from table columns)
   const [tableFilters, setTableFilters] = useState({
     date: '',
     tester: '',
-    grade: '',
+    grade: [] as string[],
     lot: '',
     rating: ''
   });
@@ -85,16 +85,24 @@ export const AnalyticsDashboard: React.FC = () => {
 
   // --- Derived Data ---
   const filteredData = useMemo(() => {
-    return data.filter(item => {
-      const dateStr = `${item.date} ${item.time}`;
-      const dateMatch = tableFilters.date === '' || dateStr === tableFilters.date;
-      const testerMatch = tableFilters.tester === '' || item.tester === tableFilters.tester;
-      const gradeMatch = tableFilters.grade === '' || item.grade === tableFilters.grade;
-      const lotMatch = tableFilters.lot === '' || item.lot === tableFilters.lot;
-      const ratingMatch = tableFilters.rating === '' || item.rating.toString() === tableFilters.rating;
-      
-      return dateMatch && testerMatch && gradeMatch && lotMatch && ratingMatch;
-    });
+    return data
+      .filter(item => {
+        const dateStr = `${item.date} ${item.time}`;
+        const dateMatch = tableFilters.date === '' || dateStr === tableFilters.date;
+        const testerMatch = tableFilters.tester === '' || item.tester === tableFilters.tester;
+        const gradeMatch = tableFilters.grade.length === 0 || tableFilters.grade.includes(item.grade);
+        const lotMatch = tableFilters.lot === '' || item.lot === tableFilters.lot;
+        const ratingMatch = tableFilters.rating === '' || item.rating.toString() === tableFilters.rating;
+        
+        return dateMatch && testerMatch && gradeMatch && lotMatch && ratingMatch;
+      })
+      .sort((a, b) => {
+        // Primary Sort: Lot Number
+        const lotCompare = a.lot.localeCompare(b.lot);
+        if (lotCompare !== 0) return lotCompare;
+        // Secondary Sort: Tester
+        return a.tester.localeCompare(b.tester);
+      });
   }, [data, tableFilters]);
 
   const overallStats = useMemo(() => {
@@ -113,7 +121,7 @@ export const AnalyticsDashboard: React.FC = () => {
         const dateStr = `${item.date} ${item.time}`;
         const dateMatch = excludeKey === 'date' || tableFilters.date === '' || dateStr === tableFilters.date;
         const testerMatch = excludeKey === 'tester' || tableFilters.tester === '' || item.tester === tableFilters.tester;
-        const gradeMatch = excludeKey === 'grade' || tableFilters.grade === '' || item.grade === tableFilters.grade;
+        const gradeMatch = excludeKey === 'grade' || tableFilters.grade.length === 0 || tableFilters.grade.includes(item.grade);
         const lotMatch = excludeKey === 'lot' || tableFilters.lot === '' || item.lot === tableFilters.lot;
         const ratingMatch = excludeKey === 'rating' || tableFilters.rating === '' || item.rating.toString() === tableFilters.rating;
         
@@ -143,22 +151,32 @@ export const AnalyticsDashboard: React.FC = () => {
       details[key] = { grade: d.grade, lot: d.lot };
     });
 
-    return Object.keys(grouped).map(key => {
-      const values = grouped[key];
-      const ratings = values.map(v => v.rating);
-      const stats = calculateQuartiles(ratings);
-      const mean = calculateMean(ratings);
-      const mode = calculateMode(ratings);
-      return {
-        key,
-        lot: details[key].lot,
-        grade: details[key].grade,
-        values, // for scatter (now includes tester)
-        ...stats, // min, q1, median, q3, max
-        mean,
-        mode
-      };
-    });
+    return Object.keys(grouped)
+      .sort((a, b) => {
+        const detA = details[a];
+        const detB = details[b];
+        // Sort by Grade first
+        const gradeCompare = detA.grade.localeCompare(detB.grade);
+        if (gradeCompare !== 0) return gradeCompare;
+        // Then by Lot Number
+        return detA.lot.localeCompare(detB.lot);
+      })
+      .map(key => {
+        const values = grouped[key];
+        const ratings = values.map(v => v.rating);
+        const stats = calculateQuartiles(ratings);
+        const mean = calculateMean(ratings);
+        const mode = calculateMode(ratings);
+        return {
+          key,
+          lot: details[key].lot,
+          grade: details[key].grade,
+          values, // for scatter
+          ...stats, // min, q1, median, q3, max
+          mean,
+          mode
+        };
+      });
   }, [filteredData]);
 
   if (loading) return <div className="h-64 flex items-center justify-center text-gray-400">Loading Analytics...</div>;
@@ -179,7 +197,6 @@ export const AnalyticsDashboard: React.FC = () => {
                    data={chartData} 
                    type={chartType} 
                    aggType={aggType}
-                   showGradeLabel={tableFilters.grade === ''}
                  />
                ) : (
                  <div className="h-full flex items-center justify-center text-gray-400 flex-col gap-2">
@@ -213,11 +230,9 @@ export const AnalyticsDashboard: React.FC = () => {
             <Settings2 className="w-4 h-4" /> Combined
           </button>
         </div>
-      </div>
 
-      {/* 1.1 Aggregation Selection */}
-      <div className="flex justify-end">
-        <div className="flex bg-[#f1f3f4] p-1 rounded">
+        {/* 1.1 Aggregation Selection moved here */}
+        <div className="flex bg-[#f1f3f4] p-1 rounded self-end xl:self-auto">
           <button 
             onClick={() => setAggType('mean')}
             className={`px-3 py-1 rounded text-xs font-medium transition-all ${aggType === 'mean' ? 'bg-white shadow-sm text-[#4285F4]' : 'text-gray-500 hover:text-gray-700'}`}
@@ -254,9 +269,9 @@ export const AnalyticsDashboard: React.FC = () => {
                 <h3 className="text-lg font-medium text-gray-800">Inspection Raw Data</h3>
                 <p className="text-sm text-gray-500">Detailed list of inspections matching current filters.</p>
               </div>
-              {Object.values(tableFilters).some(v => v !== '') && (
+              {Object.values(tableFilters).some(v => Array.isArray(v) ? v.length > 0 : v !== '') && (
                 <button 
-                  onClick={() => setTableFilters({ date: '', tester: '', grade: '', lot: '', rating: '' })}
+                  onClick={() => setTableFilters({ date: '', tester: '', grade: [], lot: '', rating: '' })}
                   className="text-xs text-[#EA4335] hover:text-[#c5221f] underline"
                 >
                   Clear All Filters
@@ -275,16 +290,12 @@ export const AnalyticsDashboard: React.FC = () => {
                   <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     <div className="flex flex-col gap-2">
                       <span>Grade</span>
-                      <select 
-                        className="font-normal text-[10px] p-1 border border-gray-200 rounded w-full focus:outline-none focus:border-[#4285F4] bg-white"
-                        value={tableFilters.grade}
-                        onChange={(e) => setTableFilters(prev => ({ ...prev, grade: e.target.value }))}
-                      >
-                        <option value="">All</option>
-                        {uniqueTableValues.grades.map(v => (
-                          <option key={v} value={v}>{v}</option>
-                        ))}
-                      </select>
+                      <MultiSelect 
+                        options={uniqueTableValues.grades}
+                        selected={tableFilters.grade}
+                        onChange={(val) => setTableFilters(prev => ({ ...prev, grade: val }))}
+                        placeholder="All"
+                      />
                     </div>
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -383,6 +394,64 @@ export const AnalyticsDashboard: React.FC = () => {
 
 // --- Sub-components ---
 
+const MultiSelect = ({ options, selected, onChange, placeholder }: { 
+  options: string[], 
+  selected: string[], 
+  onChange: (val: string[]) => void,
+  placeholder: string
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const toggleOption = (option: string) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter(o => o !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between font-normal text-[10px] p-1 border border-gray-200 rounded w-full focus:outline-none focus:border-[#4285F4] bg-white h-[26px]"
+      >
+        <span className="truncate max-w-[80px]">
+          {selected.length === 0 ? placeholder : selected.join(', ')}
+        </span>
+        <ChevronDown className="w-3 h-3 text-gray-400" />
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)}></div>
+          <div className="absolute left-0 mt-1 w-full min-w-[120px] bg-white border border-gray-200 rounded shadow-lg z-20 max-h-48 overflow-y-auto">
+            <div className="p-1">
+              <button 
+                onClick={() => { onChange([]); setIsOpen(false); }}
+                className="flex items-center w-full px-2 py-1.5 text-[10px] text-gray-500 hover:bg-gray-50 rounded"
+              >
+                Clear All
+              </button>
+              <div className="h-px bg-gray-100 my-1"></div>
+              {options.map(option => (
+                <button 
+                  key={option}
+                  onClick={() => toggleOption(option)}
+                  className="flex items-center justify-between w-full px-2 py-1.5 text-[10px] text-gray-700 hover:bg-gray-50 rounded"
+                >
+                  <span className="truncate">{option}</span>
+                  {selected.includes(option) && <Check className="w-3 h-3 text-[#4285F4]" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const StatCard = ({ label, value, color, subtext }: { label: string, value: string | number, color: string, subtext?: string }) => {
   const colors: Record<string, string> = {
     // Google Blue
@@ -406,6 +475,7 @@ const StatCard = ({ label, value, color, subtext }: { label: string, value: stri
 
 // --- SVG Chart Component (Box/Scatter) ---
 interface ChartDataPoint {
+  key: string;
   lot: string;
   grade: string;
   values: { rating: number, tester: string }[];
@@ -418,19 +488,33 @@ interface ChartDataPoint {
   mode: number;
 }
 
-const BoxScatterChart = ({ data, type, aggType, showGradeLabel }: { 
+const BoxScatterChart = ({ data, type, aggType }: { 
   data: ChartDataPoint[], 
   type: ChartType, 
-  aggType: AggregationType,
-  showGradeLabel: boolean
+  aggType: AggregationType
 }) => {
-  const chartHeight = 400;
+  const chartHeight = 480;
   const padding = { top: 20, right: 30, bottom: 120, left: 50 };
   const graphWidth = Math.max(800, data.length * 80); // Dynamic width
   const graphHeight = chartHeight - padding.top - padding.bottom;
 
   // Scale Y: Map 1-5 to pixel height
   const scaleY = (val: number) => graphHeight - ((val - 0.5) / 5) * graphHeight;
+
+  // Group data by grade for hierarchical axis
+  const gradeGroups = useMemo(() => {
+    const groups: { grade: string, startIndex: number, count: number }[] = [];
+    data.forEach((item, index) => {
+      if (groups.length === 0 || groups[groups.length - 1].grade !== item.grade) {
+        groups.push({ grade: item.grade, startIndex: index, count: 1 });
+      } else {
+        groups[groups.length - 1].count++;
+      }
+    });
+    return groups;
+  }, [data]);
+
+  const barWidth = graphWidth / data.length;
 
   return (
     <svg width="100%" height={chartHeight} viewBox={`0 0 ${graphWidth + padding.left + padding.right} ${chartHeight}`} className="overflow-visible">
@@ -449,13 +533,13 @@ const BoxScatterChart = ({ data, type, aggType, showGradeLabel }: {
 
         {/* Data Loop */}
         {data.map((item, index) => {
-          const xCenter = (index + 0.5) * (graphWidth / data.length);
-          const boxWidth = (graphWidth / data.length) * 0.4;
+          const xCenter = (index + 0.5) * barWidth;
+          const boxWidth = barWidth * 0.4;
           
           const aggValue = aggType === 'mean' ? item.mean : aggType === 'median' ? item.median : item.mode;
 
           return (
-            <g key={`${item.grade}-${item.lot}`}>
+            <g key={item.key}>
               
               {/* Box Plot Layer */}
               {(type === 'box' || type === 'combined') && (
@@ -532,22 +616,54 @@ const BoxScatterChart = ({ data, type, aggType, showGradeLabel }: {
                 );
               })()}
 
-              {/* X Axis Labels */}
+              {/* Lot Label (Horizontal) */}
               <text 
-                x={0} 
-                y={0} 
-                transform={`translate(${xCenter}, ${graphHeight + 15}) rotate(-90)`} 
-                textAnchor="end" 
+                x={xCenter} 
+                y={graphHeight + 25} 
+                textAnchor="middle" 
                 fontSize="11" 
-                fill="#3c4043"
+                fill="#5f6368"
                 fontWeight="500"
               >
-                {showGradeLabel ? `${item.grade} - ${item.lot}` : item.lot}
+                {item.lot}
               </text>
 
             </g>
           );
         })}
+
+        {/* Hierarchical Axis Bottom Layer */}
+        <g transform={`translate(0, ${graphHeight + 45})`}>
+          <line x1={0} y1={0} x2={graphWidth} y2={0} stroke="#dadce0" />
+          
+          {gradeGroups.map((group, idx) => {
+            const groupStartX = group.startIndex * barWidth;
+            const groupCenterX = groupStartX + (group.count * barWidth) / 2;
+
+            return (
+              <g key={group.grade}>
+                {/* Vertical Separator */}
+                {idx > 0 && (
+                  <line x1={groupStartX} y1={-45} x2={groupStartX} y2={40} stroke="#dadce0" strokeWidth="1" />
+                )}
+                {/* Grade Label */}
+                <text 
+                  x={groupCenterX} 
+                  y={30} 
+                  textAnchor="middle" 
+                  fontSize="12" 
+                  fontWeight="bold" 
+                  fill="#3c4043"
+                >
+                  {group.grade}
+                </text>
+              </g>
+            );
+          })}
+          {/* Final vertical line */}
+          <line x1={graphWidth} y1={-45} x2={graphWidth} y2={40} stroke="#dadce0" strokeWidth="1" />
+        </g>
+
       </g>
     </svg>
   );
