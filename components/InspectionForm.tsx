@@ -4,6 +4,7 @@ import { InspectionData } from '../types';
 import { Loader2, CheckCircle, AlertCircle, Save, HelpCircle } from 'lucide-react';
 
 const TESTER_NAMES = [
+  "Piyapad Mulsawas",
   "Kriengsak Tarasri",
   "Thanon Kahadit",
   "Jarun Thaijaroen",
@@ -53,7 +54,7 @@ export const InspectionForm: React.FC = () => {
   };
 
   const [formData, setFormData] = useState<Omit<InspectionData, 'id' | 'createdAt'>>({
-    tester: '',
+    tester: 'Piyapad Mulsawas',
     date: getLocalDate(),
     time: getLocalTime(),
     grade: '',
@@ -177,7 +178,7 @@ export const InspectionForm: React.FC = () => {
   const handleSuccess = () => {
     setSuccess(true);
     setFormData({
-      tester: '',
+      tester: 'Piyapad Mulsawas',
       date: getLocalDate(),
       time: getLocalTime(),
       grade: '',
