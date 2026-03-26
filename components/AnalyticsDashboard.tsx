@@ -75,9 +75,13 @@ export const AnalyticsDashboard: React.FC = () => {
   useEffect(() => {
     const q = query(collection(db, "inspections"), orderBy("createdAt", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const rawData = snapshot.docs.map(doc => ({
-         ...doc.data()
-      } as InspectionData));
+      const rawData = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          ...d,
+          lot: (d.lot || '').toString().toUpperCase().trim()
+        } as InspectionData;
+      });
       setData(rawData);
       setLoading(false);
     });
@@ -449,20 +453,20 @@ const MatrixHeatmap = ({ data, aggType }: { data: InspectionData[], aggType: Agg
     return { grades, lines, matrix };
   }, [data]);
 
-  const calculateValue = (values: number[]) => {
+  const calculateStats = (values: number[]) => {
     if (!values || values.length === 0) return null;
     
-    if (aggType === 'mean') {
-      return values.reduce((a, b) => a + b, 0) / values.length;
-    }
+    const min = Math.min(...values);
+    const max = Math.max(...values);
     
-    if (aggType === 'median') {
+    let aggValue = 0;
+    if (aggType === 'mean') {
+      aggValue = values.reduce((a, b) => a + b, 0) / values.length;
+    } else if (aggType === 'median') {
       const sorted = [...values].sort((a, b) => a - b);
       const mid = Math.floor(sorted.length / 2);
-      return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-    }
-    
-    if (aggType === 'mode') {
+      aggValue = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    } else if (aggType === 'mode') {
       const counts: Record<number, number> = {};
       values.forEach(v => counts[v] = (counts[v] || 0) + 1);
       let maxCount = 0;
@@ -473,10 +477,10 @@ const MatrixHeatmap = ({ data, aggType }: { data: InspectionData[], aggType: Agg
           mode = Number(val);
         }
       }
-      return mode;
+      aggValue = mode;
     }
     
-    return null;
+    return { aggValue, min, max };
   };
 
   const getColorClass = (value: number) => {
@@ -512,16 +516,25 @@ const MatrixHeatmap = ({ data, aggType }: { data: InspectionData[], aggType: Agg
               </td>
               {heatmapData.grades.map(grade => {
                 const values = heatmapData.matrix[line]?.[grade];
-                const val = calculateValue(values);
+                const stats = calculateStats(values);
                 
                 return (
                   <td key={grade} className="p-0">
                     <div className={`
-                      h-16 rounded-lg flex items-center justify-center text-lg font-bold transition-all
-                      ${val !== null ? getColorClass(val) : 'bg-gray-50 text-gray-300'}
+                      h-16 rounded-lg flex flex-col items-center justify-center transition-all
+                      ${stats !== null ? getColorClass(stats.aggValue) : 'bg-gray-50 text-gray-300'}
                       shadow-sm hover:scale-[1.02] cursor-default
                     `}>
-                      {val !== null ? (aggType === 'mean' ? val.toFixed(1) : val) : '-'}
+                      {stats !== null ? (
+                        <>
+                          <div className="text-[10px] opacity-80 font-semibold uppercase leading-tight mb-0.5">
+                            {aggType === 'mean' ? 'Mean' : aggType === 'median' ? 'Median' : 'Mode'}: {aggType === 'mean' ? stats.aggValue.toFixed(1) : stats.aggValue}
+                          </div>
+                          <div className="text-base font-bold">
+                            {stats.min} - {stats.max}
+                          </div>
+                        </>
+                      ) : '-'}
                     </div>
                   </td>
                 );

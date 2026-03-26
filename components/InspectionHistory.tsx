@@ -198,10 +198,14 @@ export const InspectionHistory: React.FC = () => {
   useEffect(() => {
     const q = query(collection(db, "inspections"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as InspectionData));
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          lot: (d.lot || '').toString().toUpperCase().trim()
+        } as InspectionData;
+      });
       setInspections(data);
       setLoading(false);
     });

@@ -143,8 +143,13 @@ export const InspectionForm: React.FC = () => {
 
   const saveNewRecord = async () => {
     try {
-      await addDoc(collection(db, "inspections"), {
+      const normalizedFormData = {
         ...formData,
+        lot: formData.lot.toUpperCase().trim()
+      };
+      
+      await addDoc(collection(db, "inspections"), {
+        ...normalizedFormData,
         createdAt: Date.now()
       });
       handleSuccess();
@@ -163,8 +168,13 @@ export const InspectionForm: React.FC = () => {
     
     try {
       const docRef = doc(db, "inspections", duplicateRecord.id);
-      await updateDoc(docRef, {
+      const normalizedFormData = {
         ...formData,
+        lot: formData.lot.toUpperCase().trim()
+      };
+      
+      await updateDoc(docRef, {
+        ...normalizedFormData,
         createdAt: Date.now() // Update timestamp to reflect the edit
       });
       handleSuccess();
