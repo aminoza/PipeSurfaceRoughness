@@ -4,13 +4,13 @@ import { InspectionData } from '../types';
 import { Trash2, Search, FileText, Download, Box, Edit, X, Save, Users, ChevronDown, Check, Filter } from 'lucide-react';
 
 const TESTER_NAMES = [
-  "Piyapad Mulsawas",
-  "Kriengsak Tarasri",
-  "Thanon Kahadit",
-  "Jarun Thaijaroen",
   "Danai Paragum",
+  "Jarun Thaijaroen",
+  "Kriengsak Tarasri",
+  "Piyapad Mulsawas",
   "Pradit Nutthanara",
   "Saikhim Panawes",
+  "Thanon Kahadit",
   "Thunchanok Hongsakul"
 ];
 
@@ -604,7 +604,7 @@ export const InspectionHistory: React.FC = () => {
                   name="tester" 
                   value={currentEditItem.tester}
                   onChange={handleEditChange}
-                  className="w-full px-3 py-2 rounded border border-gray-300 focus:ring-2 focus:ring-[#4285F4] outline-none text-sm bg-white"
+                  className="w-full px-3 py-2 rounded border border-gray-300 focus:ring-2 focus:ring-[#4285F4] outline-none text-sm bg-white text-gray-900"
                 >
                    {TESTER_NAMES.map(name => (
                      <option key={name} value={name}>{name}</option>

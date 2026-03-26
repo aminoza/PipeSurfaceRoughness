@@ -4,13 +4,13 @@ import { InspectionData } from '../types';
 import { Loader2, CheckCircle, AlertCircle, Save, HelpCircle } from 'lucide-react';
 
 const TESTER_NAMES = [
-  "Piyapad Mulsawas",
-  "Kriengsak Tarasri",
-  "Thanon Kahadit",
-  "Jarun Thaijaroen",
   "Danai Paragum",
+  "Jarun Thaijaroen",
+  "Kriengsak Tarasri",
+  "Piyapad Mulsawas",
   "Pradit Nutthanara",
   "Saikhim Panawes",
+  "Thanon Kahadit",
   "Thunchanok Hongsakul"
 ];
 
@@ -54,7 +54,7 @@ export const InspectionForm: React.FC = () => {
   };
 
   const [formData, setFormData] = useState<Omit<InspectionData, 'id' | 'createdAt'>>({
-    tester: 'Piyapad Mulsawas',
+    tester: '',
     date: getLocalDate(),
     time: getLocalTime(),
     grade: '',
@@ -178,7 +178,7 @@ export const InspectionForm: React.FC = () => {
   const handleSuccess = () => {
     setSuccess(true);
     setFormData({
-      tester: 'Piyapad Mulsawas',
+      tester: '',
       date: getLocalDate(),
       time: getLocalTime(),
       grade: '',
@@ -280,7 +280,7 @@ export const InspectionForm: React.FC = () => {
               name="tester"
               value={formData.tester}
               onChange={handleChange}
-              className="w-full px-4 py-3 rounded border border-gray-300 focus:ring-2 focus:ring-[#4285F4] focus:border-[#4285F4] transition-all outline-none bg-white text-base"
+              className="w-full px-4 py-3 rounded border border-gray-300 focus:ring-2 focus:ring-[#4285F4] focus:border-[#4285F4] transition-all outline-none bg-white text-base text-gray-900"
             >
               <option value="" disabled>Select Tester</option>
               {TESTER_NAMES.map((name) => (
@@ -329,7 +329,7 @@ export const InspectionForm: React.FC = () => {
                     setFormData(prev => ({ ...prev, grade: '' }));
                   }
                 }}
-                className="w-full px-4 py-3 rounded border border-gray-300 focus:ring-2 focus:ring-[#4285F4] focus:border-[#4285F4] transition-all outline-none bg-white text-base"
+                className="w-full px-4 py-3 rounded border border-gray-300 focus:ring-2 focus:ring-[#4285F4] focus:border-[#4285F4] transition-all outline-none bg-white text-base text-gray-900"
               >
                 <option value="" disabled>Select Grade</option>
                 {PIPE_GRADES.map((grade) => (

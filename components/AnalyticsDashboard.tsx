@@ -60,7 +60,8 @@ export const AnalyticsDashboard: React.FC = () => {
   
   // Filters & Controls
   const [chartType, setChartType] = useState<ChartType>('scatter');
-  const [aggType, setAggType] = useState<AggregationType>('mean');
+  const [aggType, setAggType] = useState<AggregationType>('mode');
+  const [heatmapAggType, setHeatmapAggType] = useState<AggregationType>('mode');
 
   // Unified filters (from table columns)
   const [tableFilters, setTableFilters] = useState({
@@ -390,12 +391,31 @@ export const AnalyticsDashboard: React.FC = () => {
 
         {/* 0. Matrix Heatmap (Overview) */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="flex items-center gap-2 mb-4">
-            <Grid3X3 className="w-5 h-5 text-[#4285F4]" />
-            <h3 className="text-lg font-medium text-gray-800">Matrix Heatmap (Global Overview)</h3>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <Grid3X3 className="w-5 h-5 text-[#4285F4]" />
+              <h3 className="text-lg font-medium text-gray-800">Matrix Heatmap (Global Overview)</h3>
+            </div>
+            
+            {/* Heatmap Aggregation Selector */}
+            <div className="flex bg-gray-100 p-1 rounded-lg self-start">
+              {(['mean', 'median', 'mode'] as AggregationType[]).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setHeatmapAggType(type)}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    heatmapAggType === type
+                      ? 'bg-white text-[#4285F4] shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {type === 'mean' ? 'Mean' : type === 'median' ? 'Middle (Median)' : 'Most (Mode)'}
+                </button>
+              ))}
+            </div>
           </div>
-          <p className="text-sm text-gray-500 mb-6">Quick overview of all data patterns by Grade and Lot. (Unaffected by table filters)</p>
-          <MatrixHeatmap data={data} />
+          <p className="text-sm text-gray-500 mb-6">Quick overview of all data patterns by Grade and Production Line. (Unaffected by table filters)</p>
+          <MatrixHeatmap data={data} aggType={heatmapAggType} />
         </div>
 
     </div>
@@ -404,38 +424,79 @@ export const AnalyticsDashboard: React.FC = () => {
 
 // --- Sub-components ---
 
-const MatrixHeatmap = ({ data }: { data: InspectionData[] }) => {
+const MatrixHeatmap = ({ data, aggType }: { data: InspectionData[], aggType: AggregationType }) => {
   const heatmapData = useMemo(() => {
     const grades = Array.from(new Set(data.map(d => d.grade))).sort();
-    const lots = Array.from(new Set(data.map(d => d.lot))).sort();
     
-    const matrix: Record<string, Record<string, { sum: number, count: number }>> = {};
+    const getLine = (lot: string) => {
+      if (!lot || lot.length < 2) return lot || 'Unknown';
+      // Match all alphabetic characters starting from index 1
+      const match = lot.substring(1).match(/^[A-Za-z]+/);
+      return match ? match[0].toUpperCase() : lot.charAt(1).toUpperCase();
+    };
+
+    const lines = Array.from(new Set(data.map(d => getLine(d.lot)))).sort();
+    
+    const matrix: Record<string, Record<string, number[]>> = {};
     
     data.forEach(d => {
-      if (!matrix[d.lot]) matrix[d.lot] = {};
-      if (!matrix[d.lot][d.grade]) matrix[d.lot][d.grade] = { sum: 0, count: 0 };
-      matrix[d.lot][d.grade].sum += d.rating;
-      matrix[d.lot][d.grade].count += 1;
+      const line = getLine(d.lot);
+      if (!matrix[line]) matrix[line] = {};
+      if (!matrix[line][d.grade]) matrix[line][d.grade] = [];
+      matrix[line][d.grade].push(d.rating);
     });
 
-    return { grades, lots, matrix };
+    return { grades, lines, matrix };
   }, [data]);
 
+  const calculateValue = (values: number[]) => {
+    if (!values || values.length === 0) return null;
+    
+    if (aggType === 'mean') {
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    }
+    
+    if (aggType === 'median') {
+      const sorted = [...values].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+    
+    if (aggType === 'mode') {
+      const counts: Record<number, number> = {};
+      values.forEach(v => counts[v] = (counts[v] || 0) + 1);
+      let maxCount = 0;
+      let mode = values[0];
+      for (const val in counts) {
+        if (counts[val] > maxCount) {
+          maxCount = counts[val];
+          mode = Number(val);
+        }
+      }
+      return mode;
+    }
+    
+    return null;
+  };
+
   const getColorClass = (value: number) => {
-    if (value >= 90) return 'bg-[#0F9D58] text-white'; // Dark Green
-    if (value >= 80) return 'bg-[#B4D455] text-gray-800'; // Light Green
-    if (value >= 70) return 'bg-[#F4B400] text-white'; // Orange/Yellow
-    return 'bg-[#F48B8B] text-white'; // Red/Pink
+    // Rating is 1-5
+    // 1-2: Green (Good)
+    // 3: Yellow (Warning)
+    // 4-5: Red (Bad)
+    if (value <= 2) return 'bg-[#34A853] text-white'; // Green
+    if (value <= 3) return 'bg-[#FBBC05] text-white'; // Yellow
+    return 'bg-[#EA4335] text-white'; // Red
   };
 
   if (heatmapData.grades.length === 0) return null;
 
   return (
-    <div className="w-full max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+    <div className="w-full overflow-x-auto">
       <table className="w-full border-separate border-spacing-2">
         <thead className="sticky top-0 bg-white z-10">
           <tr>
-            <th className="w-32 bg-white"></th>
+            <th className="w-32 bg-white text-right pr-4 text-xs font-semibold text-gray-400 uppercase">Line</th>
             {heatmapData.grades.map(grade => (
               <th key={grade} className="px-4 py-2 text-sm font-medium text-gray-500 text-center bg-white">
                 {grade}
@@ -444,23 +505,23 @@ const MatrixHeatmap = ({ data }: { data: InspectionData[] }) => {
           </tr>
         </thead>
         <tbody>
-          {heatmapData.lots.map(lot => (
-            <tr key={lot}>
+          {heatmapData.lines.map(line => (
+            <tr key={line}>
               <td className="pr-4 py-2 text-sm font-bold text-gray-700 text-right">
-                {lot}
+                Line {line}
               </td>
               {heatmapData.grades.map(grade => {
-                const cell = heatmapData.matrix[lot]?.[grade];
-                const avg = cell ? cell.sum / cell.count : null;
+                const values = heatmapData.matrix[line]?.[grade];
+                const val = calculateValue(values);
                 
                 return (
                   <td key={grade} className="p-0">
                     <div className={`
                       h-16 rounded-lg flex items-center justify-center text-lg font-bold transition-all
-                      ${avg !== null ? getColorClass(avg) : 'bg-gray-50 text-gray-300'}
+                      ${val !== null ? getColorClass(val) : 'bg-gray-50 text-gray-300'}
                       shadow-sm hover:scale-[1.02] cursor-default
                     `}>
-                      {avg !== null ? Math.round(avg) : '-'}
+                      {val !== null ? (aggType === 'mean' ? val.toFixed(1) : val) : '-'}
                     </div>
                   </td>
                 );
