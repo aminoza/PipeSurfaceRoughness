@@ -102,10 +102,26 @@ export const AnalyticsDashboard: React.FC = () => {
         return dateMatch && testerMatch && gradeMatch && lotMatch && ratingMatch;
       })
       .sort((a, b) => {
-        // Primary Sort: Lot Number
+        // Primary Sort: Grade
+        const gradeCompare = a.grade.localeCompare(b.grade);
+        if (gradeCompare !== 0) return gradeCompare;
+
+        // Secondary Sort: Production Line (Extracted from Lot)
+        const getLine = (lot: string) => {
+          if (!lot || lot.length < 2) return lot || 'Unknown';
+          const match = lot.substring(1).match(/^[A-Za-z]+/);
+          return match ? match[0].toUpperCase() : lot.charAt(1).toUpperCase();
+        };
+        const lineA = getLine(a.lot);
+        const lineB = getLine(b.lot);
+        const lineCompare = lineA.localeCompare(lineB);
+        if (lineCompare !== 0) return lineCompare;
+
+        // Tertiary Sort: Lot Number
         const lotCompare = a.lot.localeCompare(b.lot);
         if (lotCompare !== 0) return lotCompare;
-        // Secondary Sort: Tester
+        
+        // Final Sort: Tester
         return a.tester.localeCompare(b.tester);
       });
   }, [data, tableFilters]);
@@ -163,6 +179,18 @@ export const AnalyticsDashboard: React.FC = () => {
         // Sort by Grade first
         const gradeCompare = detA.grade.localeCompare(detB.grade);
         if (gradeCompare !== 0) return gradeCompare;
+
+        // Then by Production Line
+        const getLine = (lot: string) => {
+          if (!lot || lot.length < 2) return lot || 'Unknown';
+          const match = lot.substring(1).match(/^[A-Za-z]+/);
+          return match ? match[0].toUpperCase() : lot.charAt(1).toUpperCase();
+        };
+        const lineA = getLine(detA.lot);
+        const lineB = getLine(detB.lot);
+        const lineCompare = lineA.localeCompare(lineB);
+        if (lineCompare !== 0) return lineCompare;
+
         // Then by Lot Number
         return detA.lot.localeCompare(detB.lot);
       })
@@ -676,8 +704,8 @@ const BoxScatterChart = ({ data, type, aggType }: {
         {/* Grid Lines Y */}
         {[1, 2, 3, 4, 5].map(tick => (
           <g key={tick}>
-            <line x1={0} y1={scaleY(tick)} x2={graphWidth} y2={scaleY(tick)} stroke="#e5e7eb" strokeDasharray="3 3" />
-            <text x={-10} y={scaleY(tick)} dy="0.32em" textAnchor="end" fontSize="12" fill="#5f6368">{tick}</text>
+            <line x1={0} y1={scaleY(tick)} x2={graphWidth} y2={scaleY(tick)} stroke="#d1d5db" strokeDasharray="3 3" />
+            <text x={-10} y={scaleY(tick)} dy="0.32em" textAnchor="end" fontSize="14" fill="#5f6368">{tick}</text>
           </g>
         ))}
 
@@ -689,10 +717,32 @@ const BoxScatterChart = ({ data, type, aggType }: {
           const xCenter = (index + 0.5) * barWidth;
           const boxWidth = barWidth * 0.4;
           
+          const getLine = (lot: string) => {
+            if (!lot || lot.length < 2) return lot || 'Unknown';
+            const match = lot.substring(1).match(/^[A-Za-z]+/);
+            return match ? match[0].toUpperCase() : lot.charAt(1).toUpperCase();
+          };
+
+          const currentLine = getLine(item.lot);
+          const prevLine = index > 0 ? getLine(data[index - 1].lot) : null;
+          const isNewLine = index > 0 && currentLine !== prevLine && item.grade === data[index - 1].grade;
+
           const aggValue = aggType === 'mean' ? item.mean : aggType === 'median' ? item.median : item.mode;
 
           return (
             <g key={item.key}>
+              {/* Line Separator (Dashed) */}
+              {isNewLine && (
+                <line 
+                  x1={index * barWidth} 
+                  y1={0} 
+                  x2={index * barWidth} 
+                  y2={graphHeight + 45} 
+                  stroke="#9ca3af" 
+                  strokeWidth="1.5" 
+                  strokeDasharray="4 4" 
+                />
+              )}
               
               {/* Box Plot Layer */}
               {(type === 'box' || type === 'combined') && (
@@ -737,11 +787,11 @@ const BoxScatterChart = ({ data, type, aggType }: {
                         key={i} 
                         cx={xCenter + jitter} 
                         cy={scaleY(val.rating)} 
-                        r={4} 
+                        r={6} 
                         fill="#9aa0a6" // Grey color
                         fillOpacity="0.8"
                         stroke="white"
-                        strokeWidth="1"
+                        strokeWidth="1.5"
                         className="cursor-help"
                       >
                         <title>Tester: {val.tester}</title>
@@ -757,12 +807,12 @@ const BoxScatterChart = ({ data, type, aggType }: {
                 return (
                   <g>
                     <path 
-                      d={`M ${xCenter} ${scaleY(aggValue) - 8} L ${xCenter + 6} ${scaleY(aggValue) + 4} L ${xCenter - 6} ${scaleY(aggValue) + 4} Z`}
+                      d={`M ${xCenter} ${scaleY(aggValue) - 12} L ${xCenter + 9} ${scaleY(aggValue) + 6} L ${xCenter - 9} ${scaleY(aggValue) + 6} Z`}
                       fill={markerColor}
                       stroke="white"
-                      strokeWidth="1"
+                      strokeWidth="1.5"
                     />
-                    <text x={xCenter} y={scaleY(aggValue) - 12} textAnchor="middle" fontSize="10" fill={markerColor} fontWeight="bold">
+                    <text x={xCenter} y={scaleY(aggValue) - 16} textAnchor="middle" fontSize="14" fill={markerColor} fontWeight="bold">
                       {aggValue.toFixed(2)}
                     </text>
                   </g>
@@ -772,9 +822,9 @@ const BoxScatterChart = ({ data, type, aggType }: {
               {/* Lot Label (Horizontal) */}
               <text 
                 x={xCenter} 
-                y={graphHeight + 25} 
+                y={graphHeight + 30} 
                 textAnchor="middle" 
-                fontSize="11" 
+                fontSize="14" 
                 fill="#5f6368"
                 fontWeight="500"
               >
@@ -802,9 +852,9 @@ const BoxScatterChart = ({ data, type, aggType }: {
                 {/* Grade Label */}
                 <text 
                   x={groupCenterX} 
-                  y={30} 
+                  y={35} 
                   textAnchor="middle" 
-                  fontSize="12" 
+                  fontSize="15" 
                   fontWeight="bold" 
                   fill="#3c4043"
                 >

@@ -117,9 +117,9 @@ const TesterCoverageChart = ({ data }: { data: CoverageDataPoint[] }) => {
        <g transform={`translate(${padding.left}, ${padding.top})`}>
           {Array.from({ length: maxCount + 1 }).map((_, i) => (
              <g key={i}>
-                <line x1={0} y1={scaleY(i)} x2={graphWidth} y2={scaleY(i)} stroke="#e5e7eb" strokeDasharray="3 3" />
-                <text x={-10} y={scaleY(i)} dy="0.32em" textAnchor="end" fontSize="12" fill="#5f6368">{i}</text>
-             </g>
+            <line x1={0} y1={scaleY(i)} x2={graphWidth} y2={scaleY(i)} stroke="#d1d5db" strokeDasharray="3 3" />
+            <text x={-10} y={scaleY(i)} dy="0.32em" textAnchor="end" fontSize="14" fill="#5f6368">{i}</text>
+          </g>
           ))}
           <line x1={0} y1={graphHeight} x2={graphWidth} y2={graphHeight} stroke="#dadce0" />
           {data.map((item, index) => {
@@ -142,7 +142,7 @@ const TesterCoverageChart = ({ data }: { data: CoverageDataPoint[] }) => {
                     x={xCenter} 
                     y={scaleY(item.count) - 6} 
                     textAnchor="middle" 
-                    fontSize="12" 
+                    fontSize="14" 
                     fontWeight="bold" 
                     fill="#4285F4"
                   >
@@ -153,7 +153,7 @@ const TesterCoverageChart = ({ data }: { data: CoverageDataPoint[] }) => {
                     y={0} 
                     transform={`translate(${xCenter}, ${graphHeight + 15}) rotate(-90)`} 
                     textAnchor="end" 
-                    fontSize="12" 
+                    fontSize="14" 
                     fill="#3c4043"
                     fontWeight="500"
                   >
