@@ -4,12 +4,6 @@ import { InspectionData } from '../types';
 import { BarChart2, ScatterChart, Settings2, ChevronDown, Check, Grid3X3 } from 'lucide-react';
 
 // --- Statistical Helper Functions ---
-const getLine = (lot: string) => {
-  if (!lot || lot.length < 2) return lot || 'Unknown';
-  const match = lot.substring(1).match(/^[A-Za-z]+/);
-  return match ? match[0].toUpperCase() : lot.charAt(1).toUpperCase();
-};
-
 const calculateMean = (values: number[]) => {
   if (values.length === 0) return 0;
   return values.reduce((a, b) => a + b, 0) / values.length;
@@ -68,8 +62,6 @@ export const AnalyticsDashboard: React.FC = () => {
   const [chartType, setChartType] = useState<ChartType>('scatter');
   const [aggType, setAggType] = useState<AggregationType>('mode');
   const [heatmapAggType, setHeatmapAggType] = useState<AggregationType>('mode');
-  const [heatmapGradeFilter, setHeatmapGradeFilter] = useState<string[]>([]);
-  const [heatmapLineFilter, setHeatmapLineFilter] = useState<string[]>([]);
 
   // Unified filters (from table columns)
   const [tableFilters, setTableFilters] = useState({
@@ -115,6 +107,11 @@ export const AnalyticsDashboard: React.FC = () => {
         if (gradeCompare !== 0) return gradeCompare;
 
         // Secondary Sort: Production Line (Extracted from Lot)
+        const getLine = (lot: string) => {
+          if (!lot || lot.length < 2) return lot || 'Unknown';
+          const match = lot.substring(1).match(/^[A-Za-z]+/);
+          return match ? match[0].toUpperCase() : lot.charAt(1).toUpperCase();
+        };
         const lineA = getLine(a.lot);
         const lineB = getLine(b.lot);
         const lineCompare = lineA.localeCompare(lineB);
@@ -158,8 +155,6 @@ export const AnalyticsDashboard: React.FC = () => {
       testers: Array.from(new Set(getFilteredOptions('tester').map(d => d.tester))).sort(),
       grades: Array.from(new Set(getFilteredOptions('grade').map(d => d.grade))).sort(),
       lots: Array.from(new Set(getFilteredOptions('lot').map(d => d.lot))).sort(),
-      allGrades: Array.from(new Set(data.map(d => d.grade))).sort(),
-      allLines: Array.from(new Set(data.map(d => getLine(d.lot)))).sort(),
       ratings: Array.from(new Set(getFilteredOptions('rating').map(d => d.rating.toString()))).sort((a, b) => Number(a) - Number(b))
     };
   }, [data, tableFilters]);
@@ -186,6 +181,11 @@ export const AnalyticsDashboard: React.FC = () => {
         if (gradeCompare !== 0) return gradeCompare;
 
         // Then by Production Line
+        const getLine = (lot: string) => {
+          if (!lot || lot.length < 2) return lot || 'Unknown';
+          const match = lot.substring(1).match(/^[A-Za-z]+/);
+          return match ? match[0].toUpperCase() : lot.charAt(1).toUpperCase();
+        };
         const lineA = getLine(detA.lot);
         const lineB = getLine(detB.lot);
         const lineCompare = lineA.localeCompare(lineB);
@@ -423,65 +423,31 @@ export const AnalyticsDashboard: React.FC = () => {
 
         {/* 0. Matrix Heatmap (Overview) */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-2">
               <Grid3X3 className="w-5 h-5 text-[#4285F4]" />
               <h3 className="text-lg font-medium text-gray-800">Matrix Heatmap (Global Overview)</h3>
             </div>
             
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Heatmap Filters */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-gray-500 uppercase">Grade:</span>
-                <div className="w-32">
-                  <MultiSelect 
-                    options={uniqueTableValues.allGrades}
-                    selected={heatmapGradeFilter}
-                    onChange={setHeatmapGradeFilter}
-                    placeholder="All Grades"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-gray-500 uppercase">Line:</span>
-                <div className="w-32">
-                  <MultiSelect 
-                    options={uniqueTableValues.allLines}
-                    selected={heatmapLineFilter}
-                    onChange={setHeatmapLineFilter}
-                    placeholder="All Lines"
-                  />
-                </div>
-              </div>
-
-              {/* Heatmap Aggregation Selector */}
-              <div className="flex bg-gray-100 p-1 rounded-lg">
-                {(['mean', 'median', 'mode'] as AggregationType[]).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setHeatmapAggType(type)}
-                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                      heatmapAggType === type
-                        ? 'bg-white text-[#4285F4] shadow-sm'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    {type === 'mean' ? 'Mean' : type === 'median' ? 'Median' : 'Mode'}
-                  </button>
-                ))}
-              </div>
+            {/* Heatmap Aggregation Selector */}
+            <div className="flex bg-gray-100 p-1 rounded-lg self-start">
+              {(['mean', 'median', 'mode'] as AggregationType[]).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setHeatmapAggType(type)}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    heatmapAggType === type
+                      ? 'bg-white text-[#4285F4] shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {type === 'mean' ? 'Mean' : type === 'median' ? 'Middle (Median)' : 'Most (Mode)'}
+                </button>
+              ))}
             </div>
           </div>
-          
-          <p className="text-sm text-gray-500 mb-6">Quick overview of data patterns. Use filters to hide experimental lines or specific grades.</p>
-          
-          <MatrixHeatmap 
-            data={data} 
-            aggType={heatmapAggType} 
-            selectedGrades={heatmapGradeFilter}
-            selectedLines={heatmapLineFilter}
-          />
+          <p className="text-sm text-gray-500 mb-6">Quick overview of all data patterns by Grade and Production Line. (Unaffected by table filters)</p>
+          <MatrixHeatmap data={data} aggType={heatmapAggType} />
         </div>
 
     </div>
@@ -490,38 +456,41 @@ export const AnalyticsDashboard: React.FC = () => {
 
 // --- Sub-components ---
 
-const MatrixHeatmap = ({ data, aggType, selectedGrades, selectedLines }: { 
-  data: InspectionData[], 
-  aggType: AggregationType,
-  selectedGrades: string[],
-  selectedLines: string[]
-}) => {
+const MatrixHeatmap = ({ data, aggType }: { data: InspectionData[], aggType: AggregationType }) => {
+  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  const [selectedLines, setSelectedLines] = useState<string[]>([]);
+
   const heatmapData = useMemo(() => {
-    let grades = Array.from(new Set(data.map(d => d.grade))).sort();
-    let lines = Array.from(new Set(data.map(d => getLine(d.lot)))).sort();
-    
-    // Apply filters if selected
-    if (selectedGrades.length > 0) {
-      grades = grades.filter(g => selectedGrades.includes(g));
-    }
-    if (selectedLines.length > 0) {
-      lines = lines.filter(l => selectedLines.includes(l));
-    }
+    const getLine = (lot: string) => {
+      if (!lot || lot.length < 2) return lot || 'Unknown';
+      // Match all alphabetic characters starting from index 1
+      const match = lot.substring(1).match(/^[A-Za-z]+/);
+      return match ? match[0].toUpperCase() : lot.charAt(1).toUpperCase();
+    };
+
+    const allGrades = Array.from(new Set(data.map(d => d.grade))).sort();
+    const allLines = Array.from(new Set(data.map(d => getLine(d.lot)))).sort();
+
+    const filteredData = data.filter(d => {
+      const line = getLine(d.lot);
+      const matchGrade = selectedGrades.length === 0 || selectedGrades.includes(d.grade);
+      const matchLine = selectedLines.length === 0 || selectedLines.includes(line);
+      return matchGrade && matchLine;
+    });
+
+    const grades = Array.from(new Set(filteredData.map(d => d.grade))).sort();
+    const lines = Array.from(new Set(filteredData.map(d => getLine(d.lot)))).sort();
     
     const matrix: Record<string, Record<string, InspectionData[]>> = {};
     
-    data.forEach(d => {
+    filteredData.forEach(d => {
       const line = getLine(d.lot);
-      // Only include in matrix if it matches the filters
-      if ((selectedGrades.length === 0 || selectedGrades.includes(d.grade)) &&
-          (selectedLines.length === 0 || selectedLines.includes(line))) {
-        if (!matrix[line]) matrix[line] = {};
-        if (!matrix[line][d.grade]) matrix[line][d.grade] = [];
-        matrix[line][d.grade].push(d);
-      }
+      if (!matrix[line]) matrix[line] = {};
+      if (!matrix[line][d.grade]) matrix[line][d.grade] = [];
+      matrix[line][d.grade].push(d);
     });
 
-    return { grades, lines, matrix };
+    return { allGrades, allLines, grades, lines, matrix };
   }, [data, selectedGrades, selectedLines]);
 
   const calculateStats = (items: InspectionData[]) => {
@@ -590,51 +559,92 @@ const MatrixHeatmap = ({ data, aggType, selectedGrades, selectedLines }: {
     return 'bg-[#EA4335] text-white'; // Red
   };
 
-  if (heatmapData.grades.length === 0) return null;
+  if (heatmapData.allGrades.length === 0) return null;
 
   return (
-    <div className="w-full overflow-x-auto">
-      <table className="w-full border-separate border-spacing-2">
-        <thead className="sticky top-0 bg-white z-10">
-          <tr>
-            <th className="w-32 bg-white text-right pr-4 text-xs font-semibold text-gray-400 uppercase">Line</th>
-            {heatmapData.grades.map(grade => (
-              <th key={grade} className="px-4 py-2 text-sm font-medium text-gray-500 text-center bg-white">
-                {grade}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {heatmapData.lines.map(line => (
-            <tr key={line}>
-              <td className="pr-4 py-2 text-sm font-bold text-gray-700 text-right">
-                Line {line}
-              </td>
-              {heatmapData.grades.map(grade => {
-                const values = heatmapData.matrix[line]?.[grade];
-                const stats = calculateStats(values);
-                
-                return (
-                  <td key={grade} className="p-0">
-                    <div className={`
-                      h-16 rounded-lg flex flex-col items-center justify-center transition-all
-                      ${stats !== null ? getColorClass(stats.colorValue) : 'bg-gray-50 text-gray-300'}
-                      shadow-sm hover:scale-[1.02] cursor-default
-                    `}>
-                      {stats !== null ? (
-                        <div className="text-xl font-bold">
-                          {typeof stats.aggValue === 'number' && aggType === 'mean' ? stats.aggValue.toFixed(1) : stats.aggValue}
-                        </div>
-                      ) : '-'}
-                    </div>
+    <div className="w-full flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-600">Grade:</span>
+          <div className="w-40">
+            <MultiSelect 
+              options={heatmapData.allGrades} 
+              selected={selectedGrades} 
+              onChange={setSelectedGrades} 
+              placeholder="All Grades" 
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-600">Line:</span>
+          <div className="w-40">
+            <MultiSelect 
+              options={heatmapData.allLines} 
+              selected={selectedLines} 
+              onChange={setSelectedLines} 
+              placeholder="All Lines" 
+            />
+          </div>
+        </div>
+        {(selectedGrades.length > 0 || selectedLines.length > 0) && (
+          <button 
+            onClick={() => { setSelectedGrades([]); setSelectedLines([]); }}
+            className="text-xs text-red-500 hover:text-red-700 underline"
+          >
+            Clear Filters
+          </button>
+        )}
+      </div>
+
+      <div className="w-full overflow-x-auto">
+        {heatmapData.grades.length === 0 || heatmapData.lines.length === 0 ? (
+          <div className="h-32 flex items-center justify-center text-gray-400">
+            No data matches the selected filters.
+          </div>
+        ) : (
+          <table className="w-full border-separate border-spacing-2">
+            <thead className="sticky top-0 bg-white z-10">
+              <tr>
+                <th className="w-32 bg-white text-right pr-4 text-xs font-semibold text-gray-400 uppercase">Line</th>
+                {heatmapData.grades.map(grade => (
+                  <th key={grade} className="px-4 py-2 text-sm font-medium text-gray-500 text-center bg-white">
+                    {grade}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {heatmapData.lines.map(line => (
+                <tr key={line}>
+                  <td className="pr-4 py-2 text-sm font-bold text-gray-700 text-right">
+                    Line {line}
                   </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                  {heatmapData.grades.map(grade => {
+                    const values = heatmapData.matrix[line]?.[grade];
+                    const stats = calculateStats(values);
+                    
+                    return (
+                      <td key={grade} className="p-0">
+                        <div className={`
+                          h-16 rounded-lg flex flex-col items-center justify-center transition-all
+                          ${stats !== null ? getColorClass(stats.colorValue) : 'bg-gray-50 text-gray-300'}
+                          shadow-sm hover:scale-[1.02] cursor-default
+                        `}>
+                          {stats !== null ? (
+                            <div className="text-xl font-bold">
+                              {typeof stats.aggValue === 'number' && aggType === 'mean' ? stats.aggValue.toFixed(1) : stats.aggValue}
+                            </div>
+                          ) : '-'}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 };
