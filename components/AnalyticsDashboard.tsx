@@ -4,6 +4,12 @@ import { InspectionData } from '../types';
 import { BarChart2, ScatterChart, Settings2, ChevronDown, Check, Grid3X3 } from 'lucide-react';
 
 // --- Statistical Helper Functions ---
+const getLine = (lot: string) => {
+  if (!lot || lot.length < 2) return lot || 'Unknown';
+  const match = lot.substring(1).match(/^[A-Za-z]+/);
+  return match ? match[0].toUpperCase() : lot.charAt(1).toUpperCase();
+};
+
 const calculateMean = (values: number[]) => {
   if (values.length === 0) return 0;
   return values.reduce((a, b) => a + b, 0) / values.length;
@@ -62,6 +68,8 @@ export const AnalyticsDashboard: React.FC = () => {
   const [chartType, setChartType] = useState<ChartType>('scatter');
   const [aggType, setAggType] = useState<AggregationType>('mode');
   const [heatmapAggType, setHeatmapAggType] = useState<AggregationType>('mode');
+  const [heatmapGradeFilter, setHeatmapGradeFilter] = useState<string[]>([]);
+  const [heatmapLineFilter, setHeatmapLineFilter] = useState<string[]>([]);
 
   // Unified filters (from table columns)
   const [tableFilters, setTableFilters] = useState({
@@ -107,11 +115,6 @@ export const AnalyticsDashboard: React.FC = () => {
         if (gradeCompare !== 0) return gradeCompare;
 
         // Secondary Sort: Production Line (Extracted from Lot)
-        const getLine = (lot: string) => {
-          if (!lot || lot.length < 2) return lot || 'Unknown';
-          const match = lot.substring(1).match(/^[A-Za-z]+/);
-          return match ? match[0].toUpperCase() : lot.charAt(1).toUpperCase();
-        };
         const lineA = getLine(a.lot);
         const lineB = getLine(b.lot);
         const lineCompare = lineA.localeCompare(lineB);
@@ -155,6 +158,8 @@ export const AnalyticsDashboard: React.FC = () => {
       testers: Array.from(new Set(getFilteredOptions('tester').map(d => d.tester))).sort(),
       grades: Array.from(new Set(getFilteredOptions('grade').map(d => d.grade))).sort(),
       lots: Array.from(new Set(getFilteredOptions('lot').map(d => d.lot))).sort(),
+      allGrades: Array.from(new Set(data.map(d => d.grade))).sort(),
+      allLines: Array.from(new Set(data.map(d => getLine(d.lot)))).sort(),
       ratings: Array.from(new Set(getFilteredOptions('rating').map(d => d.rating.toString()))).sort((a, b) => Number(a) - Number(b))
     };
   }, [data, tableFilters]);
@@ -181,11 +186,6 @@ export const AnalyticsDashboard: React.FC = () => {
         if (gradeCompare !== 0) return gradeCompare;
 
         // Then by Production Line
-        const getLine = (lot: string) => {
-          if (!lot || lot.length < 2) return lot || 'Unknown';
-          const match = lot.substring(1).match(/^[A-Za-z]+/);
-          return match ? match[0].toUpperCase() : lot.charAt(1).toUpperCase();
-        };
         const lineA = getLine(detA.lot);
         const lineB = getLine(detB.lot);
         const lineCompare = lineA.localeCompare(lineB);
@@ -423,31 +423,65 @@ export const AnalyticsDashboard: React.FC = () => {
 
         {/* 0. Matrix Heatmap (Overview) */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6">
             <div className="flex items-center gap-2">
               <Grid3X3 className="w-5 h-5 text-[#4285F4]" />
               <h3 className="text-lg font-medium text-gray-800">Matrix Heatmap (Global Overview)</h3>
             </div>
             
-            {/* Heatmap Aggregation Selector */}
-            <div className="flex bg-gray-100 p-1 rounded-lg self-start">
-              {(['mean', 'median', 'mode'] as AggregationType[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setHeatmapAggType(type)}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                    heatmapAggType === type
-                      ? 'bg-white text-[#4285F4] shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {type === 'mean' ? 'Mean' : type === 'median' ? 'Middle (Median)' : 'Most (Mode)'}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Heatmap Filters */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-500 uppercase">Grade:</span>
+                <div className="w-32">
+                  <MultiSelect 
+                    options={uniqueTableValues.allGrades}
+                    selected={heatmapGradeFilter}
+                    onChange={setHeatmapGradeFilter}
+                    placeholder="All Grades"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-500 uppercase">Line:</span>
+                <div className="w-32">
+                  <MultiSelect 
+                    options={uniqueTableValues.allLines}
+                    selected={heatmapLineFilter}
+                    onChange={setHeatmapLineFilter}
+                    placeholder="All Lines"
+                  />
+                </div>
+              </div>
+
+              {/* Heatmap Aggregation Selector */}
+              <div className="flex bg-gray-100 p-1 rounded-lg">
+                {(['mean', 'median', 'mode'] as AggregationType[]).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setHeatmapAggType(type)}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                      heatmapAggType === type
+                        ? 'bg-white text-[#4285F4] shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {type === 'mean' ? 'Mean' : type === 'median' ? 'Median' : 'Mode'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          <p className="text-sm text-gray-500 mb-6">Quick overview of all data patterns by Grade and Production Line. (Unaffected by table filters)</p>
-          <MatrixHeatmap data={data} aggType={heatmapAggType} />
+          
+          <p className="text-sm text-gray-500 mb-6">Quick overview of data patterns. Use filters to hide experimental lines or specific grades.</p>
+          
+          <MatrixHeatmap 
+            data={data} 
+            aggType={heatmapAggType} 
+            selectedGrades={heatmapGradeFilter}
+            selectedLines={heatmapLineFilter}
+          />
         </div>
 
     </div>
@@ -456,59 +490,94 @@ export const AnalyticsDashboard: React.FC = () => {
 
 // --- Sub-components ---
 
-const MatrixHeatmap = ({ data, aggType }: { data: InspectionData[], aggType: AggregationType }) => {
+const MatrixHeatmap = ({ data, aggType, selectedGrades, selectedLines }: { 
+  data: InspectionData[], 
+  aggType: AggregationType,
+  selectedGrades: string[],
+  selectedLines: string[]
+}) => {
   const heatmapData = useMemo(() => {
-    const grades = Array.from(new Set(data.map(d => d.grade))).sort();
+    let grades = Array.from(new Set(data.map(d => d.grade))).sort();
+    let lines = Array.from(new Set(data.map(d => getLine(d.lot)))).sort();
     
-    const getLine = (lot: string) => {
-      if (!lot || lot.length < 2) return lot || 'Unknown';
-      // Match all alphabetic characters starting from index 1
-      const match = lot.substring(1).match(/^[A-Za-z]+/);
-      return match ? match[0].toUpperCase() : lot.charAt(1).toUpperCase();
-    };
-
-    const lines = Array.from(new Set(data.map(d => getLine(d.lot)))).sort();
+    // Apply filters if selected
+    if (selectedGrades.length > 0) {
+      grades = grades.filter(g => selectedGrades.includes(g));
+    }
+    if (selectedLines.length > 0) {
+      lines = lines.filter(l => selectedLines.includes(l));
+    }
     
-    const matrix: Record<string, Record<string, number[]>> = {};
+    const matrix: Record<string, Record<string, InspectionData[]>> = {};
     
     data.forEach(d => {
       const line = getLine(d.lot);
-      if (!matrix[line]) matrix[line] = {};
-      if (!matrix[line][d.grade]) matrix[line][d.grade] = [];
-      matrix[line][d.grade].push(d.rating);
+      // Only include in matrix if it matches the filters
+      if ((selectedGrades.length === 0 || selectedGrades.includes(d.grade)) &&
+          (selectedLines.length === 0 || selectedLines.includes(line))) {
+        if (!matrix[line]) matrix[line] = {};
+        if (!matrix[line][d.grade]) matrix[line][d.grade] = [];
+        matrix[line][d.grade].push(d);
+      }
     });
 
     return { grades, lines, matrix };
-  }, [data]);
+  }, [data, selectedGrades, selectedLines]);
 
-  const calculateStats = (values: number[]) => {
-    if (!values || values.length === 0) return null;
+  const calculateStats = (items: InspectionData[]) => {
+    if (!items || items.length === 0) return null;
     
+    const values = items.map(i => i.rating);
     const min = Math.min(...values);
     const max = Math.max(...values);
     
-    let aggValue = 0;
+    let aggValue: number | string = 0;
+    let colorValue = 0;
+    
     if (aggType === 'mean') {
       aggValue = values.reduce((a, b) => a + b, 0) / values.length;
+      colorValue = aggValue;
     } else if (aggType === 'median') {
       const sorted = [...values].sort((a, b) => a - b);
       const mid = Math.floor(sorted.length / 2);
       aggValue = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+      colorValue = aggValue;
     } else if (aggType === 'mode') {
-      const counts: Record<number, number> = {};
-      values.forEach(v => counts[v] = (counts[v] || 0) + 1);
-      let maxCount = 0;
-      let mode = values[0];
-      for (const val in counts) {
-        if (counts[val] > maxCount) {
-          maxCount = counts[val];
-          mode = Number(val);
+      // Group by lot to find modes of each lot
+      const lotGroups: Record<string, number[]> = {};
+      items.forEach(item => {
+        if (!lotGroups[item.lot]) lotGroups[item.lot] = [];
+        lotGroups[item.lot].push(item.rating);
+      });
+
+      const findMode = (vals: number[]) => {
+        const counts: Record<number, number> = {};
+        vals.forEach(v => counts[v] = (counts[v] || 0) + 1);
+        let maxCount = 0;
+        let mode = vals[0];
+        for (const val in counts) {
+          if (counts[val] > maxCount) {
+            maxCount = counts[val];
+            mode = Number(val);
+          }
         }
+        return mode;
+      };
+
+      const lotModes = Object.values(lotGroups).map(findMode);
+      const minMode = Math.min(...lotModes);
+      const maxMode = Math.max(...lotModes);
+
+      if (minMode === maxMode) {
+        aggValue = minMode;
+        colorValue = minMode;
+      } else {
+        aggValue = `${minMode} - ${maxMode}`;
+        colorValue = (minMode + maxMode) / 2;
       }
-      aggValue = mode;
     }
     
-    return { aggValue, min, max };
+    return { aggValue, min, max, colorValue };
   };
 
   const getColorClass = (value: number) => {
@@ -550,18 +619,13 @@ const MatrixHeatmap = ({ data, aggType }: { data: InspectionData[], aggType: Agg
                   <td key={grade} className="p-0">
                     <div className={`
                       h-16 rounded-lg flex flex-col items-center justify-center transition-all
-                      ${stats !== null ? getColorClass(stats.aggValue) : 'bg-gray-50 text-gray-300'}
+                      ${stats !== null ? getColorClass(stats.colorValue) : 'bg-gray-50 text-gray-300'}
                       shadow-sm hover:scale-[1.02] cursor-default
                     `}>
                       {stats !== null ? (
-                        <>
-                          <div className="text-[10px] opacity-80 font-semibold uppercase leading-tight mb-0.5">
-                            {aggType === 'mean' ? 'Mean' : aggType === 'median' ? 'Median' : 'Mode'}: {aggType === 'mean' ? stats.aggValue.toFixed(1) : stats.aggValue}
-                          </div>
-                          <div className="text-base font-bold">
-                            {stats.min} - {stats.max}
-                          </div>
-                        </>
+                        <div className="text-xl font-bold">
+                          {typeof stats.aggValue === 'number' && aggType === 'mean' ? stats.aggValue.toFixed(1) : stats.aggValue}
+                        </div>
                       ) : '-'}
                     </div>
                   </td>
